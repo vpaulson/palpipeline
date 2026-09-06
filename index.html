@@ -186,7 +186,7 @@
       <div id="modalInfo" class="modal-info">Breeding Power: 570</div>
 
       <div class="modal-actions">
-        <button id="excludeModalBtn" class="action-btn exclude" onclick="excludeCurrentPal()">🚫 Exclude From Search</button>
+        <button id="excludeModalBtn" class="action-btn exclude" onclick="excludeCurrentPal()">Exclude From Search</button>
         <a id="wikiLink" class="action-btn wiki" href="#" target="_blank" rel="noopener">Open Pal Wiki Page ➔</a>
       </div>
     </div>
@@ -207,6 +207,7 @@
       { name: "Blazehowl", power: 710, id: "084" },
       { name: "Blazehowl Noct", power: 700, id: "084B" },
       { name: "Boarush", power: 1340, id: "020" },
+      { name: "Braloha", power: 1030, id: "110" },
       { name: "Bristla", power: 1290, id: "030" },
       { name: "Broncherry", power: 860, id: "086" },
       { name: "Broncherry Aqua", power: 855, id: "086B" },
@@ -383,7 +384,8 @@
       "Chillet + Goblean": "Chillet Ignis",
       "Quivern + Dinossom": "Quivern Botan",
       "Bushi + Arsox": "Bushi Noct",
-      "Gorirat + Digtoise": "Gorirat Terra"
+      "Gorirat + Digtoise": "Gorirat Terra",
+      "Vanwyrm + Blazamut": "Braloha"
     };
 
     let excludedPals = new Set();
@@ -397,7 +399,7 @@
         PALDEX.forEach(pal => {
           const opt = document.createElement('option');
           opt.value = pal.name;
-          opt.textContent = `${pal.name} (Power: ${pal.power})`;
+          opt.textContent = `${pal.name} (${pal.power})`;
           select.appendChild(opt);
         });
       });
@@ -489,8 +491,10 @@
       return paths;
     }
 
-    function renderPalLink(palName, extraClass = "") {
-      return `<button class="pal-link ${extraClass}" onclick="openPalModal('${palName}')">🔍 ${palName}</button>`;
+    function renderPalLink(palObj, extraClass = "") {
+      const pal = typeof palObj === "string" ? PALDEX.find(p => p.name === palObj) : palObj;
+      if (!pal) return palObj;
+      return `<button class="pal-link ${extraClass}" onclick="openPalModal('${pal.name}')">${pal.name} (${pal.power})</button>`;
     }
 
     function openPalModal(palName) {
@@ -572,12 +576,12 @@
           card.className = 'card';
 
           let lineAHTML = p.lineA_Steps.length === 0 
-            ? `<div class="step-text">Use ${renderPalLink(palA.name)} directly (0 steps)</div>`
-            : p.lineA_Steps.map(s => `<div class="step-text">${renderPalLink(s.parent.name)} × ${renderPalLink(s.filler.name, 'highlight')} (Clean) ➔ ${renderPalLink(s.result.name)}</div>`).join('');
+            ? `<div class="step-text">Use ${renderPalLink(palA)} directly (0 steps)</div>`
+            : p.lineA_Steps.map(s => `<div class="step-text">${renderPalLink(s.parent)} × ${renderPalLink(s.filler, 'highlight')} (Clean) ➔ ${renderPalLink(s.result)}</div>`).join('');
 
           let lineBHTML = p.lineB_Steps.length === 0 
-            ? `<div class="step-text">Use ${renderPalLink(palB.name)} directly (0 steps)</div>`
-            : p.lineB_Steps.map(s => `<div class="step-text">${renderPalLink(s.parent.name)} × ${renderPalLink(s.filler.name, 'highlight')} (Clean) ➔ ${renderPalLink(s.result.name)}</div>`).join('');
+            ? `<div class="step-text">Use ${renderPalLink(palB)} directly (0 steps)</div>`
+            : p.lineB_Steps.map(s => `<div class="step-text">${renderPalLink(s.parent)} × ${renderPalLink(s.filler, 'highlight')} (Clean) ➔ ${renderPalLink(s.result)}</div>`).join('');
 
           card.innerHTML = `
             <div class="route-card">
@@ -590,7 +594,7 @@
             </div>
             <div class="route-card" style="border-left-color: var(--accent-green);">
               <div class="line-title" style="color: var(--accent-green);">Final Cross (Combine All 4 Traits)</div>
-              <div class="step-text">${renderPalLink(p.finalA.name)} × ${renderPalLink(p.finalB.name)} ➔ ${renderPalLink(target.name, 'target-highlight')}</div>
+              <div class="step-text">${renderPalLink(p.finalA)} × ${renderPalLink(p.finalB)} ➔ ${renderPalLink(target, 'target-highlight')}</div>
             </div>
           `;
           resultsDiv.appendChild(card);
