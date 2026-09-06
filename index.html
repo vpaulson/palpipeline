@@ -244,17 +244,19 @@
         
         const rawData = await response.json();
         
-        PALDEX = (rawData.pals || rawData).map(p => ({
+        const palSource = Array.isArray(rawData) ? rawData : (rawData.pals || rawData.data || Object.values(rawData).find(Array.isArray) || []);
+        
+        if (!Array.isArray(palSource) || palSource.length === 0) {
+          throw new Error("Could not extract a valid Pal array from the JSON structure.");
+        }
+
+        PALDEX = palSource.map(p => ({
           name: p.name,
-          power: p.breedingPower ?? p.power,
-          id: String(p.id ?? "001")
+          power: p.breedingPower ?? p.power ?? p.value,
+          id: String(p.id ?? p.paldexId ?? "001")
         })).sort((a, b) => a.name.localeCompare(b.name));
 
-        SPECIAL_COMBOS = rawData.combos || {};
-
-        if (PALDEX.length === 0) {
-          throw new Error("Dataset loaded successfully, but the Pal roster is empty.");
-        }
+        SPECIAL_COMBOS = rawData.combos || rawData.specialCombos || {};
 
         populateSelects();
         
@@ -278,7 +280,7 @@
       const errorHTML = `
         <div id="errorContainer" class="error-card">
           <h3>Failed to Load Palworld Datapack</h3>
-          <p>Could not fetch version-controlled JSON definitions. Details: <strong>${errorMessage}</strong></p>
+          <p>Could not process version-controlled JSON definitions. Details: <strong>${errorMessage}</strong></p>
           <button class="retry-btn" onclick="initializeApp()">Retry Loading</button>
         </div>
       `;
