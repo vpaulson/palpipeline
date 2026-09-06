@@ -59,24 +59,30 @@
   <div id="results"></div>
 
   <script>
-    // Official Datamined Palworld Breeding Powers
+    // Complete Datamined Palworld Breeding Powers (Base + Sakurajima Expansion)
     const PALDEX = [
       { name: "Anubis", power: 570 },
       { name: "Arsox", power: 790 },
       { name: "Astegon", power: 130 },
       { name: "Azurobe", power: 560 },
+      { name: "Baojin", power: 1040 },
       { name: "Beegarde", power: 1210 },
       { name: "Beacon", power: 220 },
       { name: "Blazamut", power: 10 },
+      { name: "Blazamut Ryu", power: 8 },
       { name: "Boarush", power: 1340 },
       { name: "Bushi", power: 640 },
+      { name: "Bushi Noct", power: 635 },
       { name: "Caprity", power: 970 },
       { name: "Cattiva", power: 1460 },
       { name: "Celaray", power: 850 },
       { name: "Chillet", power: 800 },
+      { name: "Chillet Ignis", power: 795 },
       { name: "Cinnamoth", power: 490 },
       { name: "Corntail", power: 1100 },
+      { name: "Croajiro", power: 1135 },
       { name: "Daedream", power: 1230 },
+      { name: "Dazemu", power: 760 },
       { name: "Digtoise", power: 650 },
       { name: "Dinossom", power: 780 },
       { name: "Dinossom Lux", power: 770 },
@@ -98,11 +104,13 @@
       { name: "Galeclaw", power: 930 },
       { name: "Goblean", power: 1190 },
       { name: "Gorirat", power: 1050 },
+      { name: "Gorirat Terra", power: 1045 },
       { name: "Grizzbolt", power: 200 },
       { name: "Gumoss", power: 1240 },
       { name: "Hangyu", power: 1440 },
       { name: "Hangyu Cryst", power: 1430 },
       { name: "Helzephyr", power: 190 },
+      { name: "Helzephyr Lux", power: 185 },
       { name: "Hoocrates", power: 1390 },
       { name: "Incineram", power: 580 },
       { name: "Incineram Noct", power: 575 },
@@ -112,11 +120,15 @@
       { name: "Jormuntide", power: 310 },
       { name: "Jormuntide Ignis", power: 315 },
       { name: "Katress", power: 460 },
+      { name: "Katress Ignis", power: 455 },
       { name: "Kelpsea", power: 1280 },
       { name: "Kelpsea Ignis", power: 1290 },
+      { name: "Kikit", power: 1305 },
       { name: "Killamari", power: 1260 },
       { name: "Kingpaca", power: 470 },
       { name: "Ice Kingpaca", power: 465 },
+      { name: "Knocklem", power: 105 },
+      { name: "Lalleyn", power: 245 },
       { name: "Lamball", power: 1470 },
       { name: "Leezpunk", power: 1130 },
       { name: "Leezpunk Ignis", power: 1120 },
@@ -133,6 +145,7 @@
       { name: "Maraith", power: 1150 },
       { name: "Melpaca", power: 1080 },
       { name: "Menasting", power: 110 },
+      { name: "Menasting Terra", power: 105 },
       { name: "Mossanda", power: 480 },
       { name: "Mossanda Lux", power: 475 },
       { name: "Mozzarina", power: 960 },
@@ -146,6 +159,7 @@
       { name: "Pyrin", power: 380 },
       { name: "Pyrin Noct", power: 370 },
       { name: "Quivern", power: 330 },
+      { name: "Quivern Botan", power: 325 },
       { name: "Ragnahawk", power: 390 },
       { name: "Rayhound", power: 740 },
       { name: "Relaxaurus", power: 280 },
@@ -157,8 +171,10 @@
       { name: "Robinquill Terra", power: 1015 },
       { name: "Rooby", power: 1160 },
       { name: "Rushoar", power: 1110 },
+      { name: "Selyne", power: 15 },
       { name: "Shadowbeak", power: 140 },
       { name: "Sibelyx", power: 500 },
+      { name: "Sootser", power: 1030 },
       { name: "Sparkit", power: 1410 },
       { name: "Surfent", power: 550 },
       { name: "Surfent Terra", power: 540 },
@@ -178,10 +194,12 @@
       { name: "Wumpo", power: 430 },
       { name: "Wumpo Botan", power: 420 },
       { name: "Woolipop", power: 1170 },
-      { name: "Wixen", power: 1140 }
+      { name: "Wixen", power: 1140 },
+      { name: "Wixen Noct", power: 1135 },
+      { name: "Yakumo", power: 920 }
     ].sort((a, b) => a.name.localeCompare(b.name));
 
-    // Game File Special Breeding Combination Overrides
+    // Special Breeding Combination Overrides
     const SPECIAL_COMBOS = {
       "Frostallion + Helzephyr": "Frostallion Noct",
       "Relaxaurus + Sparkit": "Relaxaurus Lux",
@@ -193,7 +211,12 @@
       "Lyleen + Mossanda": "Lyleen Noct",
       "Pyrin + Katress": "Pyrin Noct",
       "Reptyro + Foxcicle": "Ice Reptyro",
-      "Robinquill + Faleris": "Robinquill Terra"
+      "Robinquill + Faleris": "Robinquill Terra",
+      "Katress + Wixen": "Katress Ignis",
+      "Chillet + Goblean": "Chillet Ignis",
+      "Quivern + Dinossom": "Quivern Botan",
+      "Bushi + Arsox": "Bushi Noct",
+      "Gorirat + Digtoise": "Gorirat Terra"
     };
 
     function populateSelects() {
