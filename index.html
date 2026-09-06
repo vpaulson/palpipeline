@@ -26,14 +26,78 @@
     label { display: block; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); margin-bottom: 6px; }
     select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: #0b0f19; color: var(--text); font-size: 1rem; margin-bottom: 14px; }
     
-    button { width: 100%; background: var(--accent); color: #0b0f19; border: none; padding: 14px; border-radius: 8px; font-weight: 700; font-size: 1rem; cursor: pointer; transition: opacity 0.2s; }
-    button:active { opacity: 0.8; }
+    button.calc-btn { width: 100%; background: var(--accent); color: #0b0f19; border: none; padding: 14px; border-radius: 8px; font-weight: 700; font-size: 1rem; cursor: pointer; transition: opacity 0.2s; }
+    button.calc-btn:active { opacity: 0.8; }
 
     .route-card { background: #0b0f19; border-left: 4px solid var(--accent); padding: 12px; border-radius: 6px; margin-bottom: 10px; }
-    .line-title { font-weight: 700; color: var(--accent); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
-    .step-text { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 4px; }
-    .highlight { color: #f43f5e; font-weight: 600; }
-    .target-highlight { color: var(--accent-green); font-weight: 700; }
+    .line-title { font-weight: 700; color: var(--accent); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+    .step-text { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 6px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+    
+    /* Pal Clickable Button Style */
+    .pal-link {
+      background: #1e293b;
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      text-decoration: none;
+    }
+    .pal-link:hover, .pal-link:active {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .pal-link.highlight { border-color: #f43f5e; color: #f43f5e; }
+    .pal-link.target-highlight { border-color: var(--accent-green); color: var(--accent-green); }
+
+    /* Modal Image Popup Styling */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+    }
+    .modal-content {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      width: 100%;
+      max-width: 300px;
+      text-align: center;
+      position: relative;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+    .modal-img {
+      width: 120px;
+      height: 120px;
+      object-fit: contain;
+      margin: 12px auto;
+      display: block;
+      background: #0b0f19;
+      border-radius: 12px;
+      padding: 8px;
+      border: 1px solid var(--border);
+    }
+    .modal-title { font-size: 1.2rem; font-weight: 700; color: var(--text); }
+    .modal-info { font-size: 0.85rem; color: var(--text-dim); margin-top: 4px; }
+    .close-btn {
+      position: absolute;
+      top: 10px; right: 14px;
+      background: none; border: none;
+      color: var(--text-dim); font-size: 1.4rem;
+      font-weight: bold; cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -61,10 +125,19 @@
       <option value="6">6 Steps Max</option>
     </select>
 
-    <button onclick="calculateRoutes()">Build Multi-Step Pipeline</button>
+    <button class="calc-btn" onclick="calculateRoutes()">Build Multi-Step Pipeline</button>
   </div>
 
   <div id="results"></div>
+
+  <div id="palModal" class="modal-overlay" onclick="closeModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <button class="close-btn" onclick="closeModal()">&times;</button>
+      <div id="modalTitle" class="modal-title">Pal Name</div>
+      <img id="modalImg" class="modal-img" src="" alt="Pal Image" />
+      <div id="modalInfo" class="modal-info">Breeding Power: 570</div>
+    </div>
+  </div>
 
   <script>
     const PALDEX = [
@@ -265,7 +338,6 @@
       return closest;
     }
 
-    // BFS Pathfinding to get single-line chains from startPal to possible targets
     function findChains(startPal, maxDepth) {
       let paths = {};
       let queue = [{ pal: startPal, steps: [] }];
@@ -289,6 +361,37 @@
       return paths;
     }
 
+    // Helper function to render a clickable Pal button
+    function renderPalLink(palName, extraClass = "") {
+      return `<button class="pal-link ${extraClass}" onclick="openPalModal('${palName}')">🔍 ${palName}</button>`;
+    }
+
+    // Image Popup Handler
+    function openPalModal(palName) {
+      const pal = PALDEX.find(p => p.name === palName);
+      if (!pal) return;
+
+      // Clean Pal name for Wiki Image URL format
+      const formattedName = palName.replace(/ /g, "_");
+      const imgUrl = `https://static.wikia.nocookie.net/palworld/images/thumb/${formattedName}.png/200px-${formattedName}.png`;
+
+      document.getElementById('modalTitle').textContent = pal.name;
+      document.getElementById('modalInfo').textContent = `Breeding Power: ${pal.power}`;
+      
+      const imgElem = document.getElementById('modalImg');
+      imgElem.src = imgUrl;
+      imgElem.onerror = () => {
+        // Fallback image if CDN thumb fails
+        imgElem.src = "https://raw.githubusercontent.com/fandom/palworld-wiki/main/icon.png";
+      };
+
+      document.getElementById('palModal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('palModal').style.display = 'none';
+    }
+
     function calculateRoutes() {
       const nameA = document.getElementById('startA').value;
       const nameB = document.getElementById('startB').value;
@@ -308,7 +411,6 @@
 
         let validPipelines = [];
 
-        // Check which intermediate outputs from Chain A & Chain B cross to Target
         for (let interA_Name in chainsA) {
           for (let interB_Name in chainsB) {
             let interA_Pal = PALDEX.find(p => p.name === interA_Name);
@@ -337,17 +439,17 @@
 
         resultsDiv.innerHTML = `<h2 style="font-size:1rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-dim); margin-bottom:12px;">Found ${validPipelines.length} Available Multi-Step Pipelines</h2>`;
 
-        validPipelines.slice(0, 5).forEach((p, idx) => {
+        validPipelines.slice(0, 5).forEach((p) => {
           const card = document.createElement('div');
           card.className = 'card';
 
           let lineAHTML = p.lineA_Steps.length === 0 
-            ? `<div class="step-text">Use <strong>${palA.name}</strong> directly (0 steps)</div>`
-            : p.lineA_Steps.map(s => `<div class="step-text">${s.parent.name} × <span class="highlight">${s.filler.name}</span> (Clean) ➔ <strong>${s.result.name}</strong></div>`).join('');
+            ? `<div class="step-text">Use ${renderPalLink(palA.name)} directly (0 steps)</div>`
+            : p.lineA_Steps.map(s => `<div class="step-text">${renderPalLink(s.parent.name)} × ${renderPalLink(s.filler.name, 'highlight')} (Clean) ➔ ${renderPalLink(s.result.name)}</div>`).join('');
 
           let lineBHTML = p.lineB_Steps.length === 0 
-            ? `<div class="step-text">Use <strong>${palB.name}</strong> directly (0 steps)</div>`
-            : p.lineB_Steps.map(s => `<div class="step-text">${s.parent.name} × <span class="highlight">${s.filler.name}</span> (Clean) ➔ <strong>${s.result.name}</strong></div>`).join('');
+            ? `<div class="step-text">Use ${renderPalLink(palB.name)} directly (0 steps)</div>`
+            : p.lineB_Steps.map(s => `<div class="step-text">${renderPalLink(s.parent.name)} × ${renderPalLink(s.filler.name, 'highlight')} (Clean) ➔ ${renderPalLink(s.result.name)}</div>`).join('');
 
           card.innerHTML = `
             <div class="route-card">
@@ -360,7 +462,7 @@
             </div>
             <div class="route-card" style="border-left-color: var(--accent-green);">
               <div class="line-title" style="color: var(--accent-green);">Final Cross (Combine All 4 Traits)</div>
-              <div class="step-text">${p.finalA.name} × ${p.finalB.name} ➔ <span class="target-highlight">${target.name}</span></div>
+              <div class="step-text">${renderPalLink(p.finalA.name)} × ${renderPalLink(p.finalB.name)} ➔ ${renderPalLink(target.name, 'target-highlight')}</div>
             </div>
           `;
           resultsDiv.appendChild(card);
