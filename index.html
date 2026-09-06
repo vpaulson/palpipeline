@@ -31,7 +31,7 @@
 
     .route-card { background: #0b0f19; border-left: 4px solid var(--accent); padding: 12px; border-radius: 6px; margin-bottom: 10px; }
     .line-title { font-weight: 700; color: var(--accent); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
-    .step-text { font-size: 0.9rem; color: var(--text-dim); }
+    .step-text { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 4px; }
     .highlight { color: #f43f5e; font-weight: 600; }
     .target-highlight { color: var(--accent-green); font-weight: 700; }
   </style>
@@ -40,7 +40,7 @@
 
   <div class="brand">
     <h1>Pal<span>Pipeline</span></h1>
-    <p class="subtitle">2x2 Trait Isolation & Cross-Breeding Engine</p>
+    <p class="subtitle">Multi-Step 2x2 Trait Isolation & Cross-Breeding Engine</p>
   </div>
 
   <div class="card">
@@ -53,13 +53,20 @@
     <label for="targetPal">Target Pal (Final Goal)</label>
     <select id="targetPal"></select>
 
-    <button onclick="calculateRoutes()">Build 2x2 Pipeline</button>
+    <label for="maxDepth">Max Chain Depth (Safety Cap)</label>
+    <select id="maxDepth">
+      <option value="2">2 Steps Max</option>
+      <option value="3">3 Steps Max</option>
+      <option value="4" selected>4 Steps Max (Recommended)</option>
+      <option value="6">6 Steps Max</option>
+    </select>
+
+    <button onclick="calculateRoutes()">Build Multi-Step Pipeline</button>
   </div>
 
   <div id="results"></div>
 
   <script>
-    // Complete Datamined Palworld Breeding Powers (Base + Sakurajima Expansion)
     const PALDEX = [
       { name: "Anubis", power: 570 },
       { name: "Arsox", power: 790 },
@@ -199,7 +206,6 @@
       { name: "Yakumo", power: 920 }
     ].sort((a, b) => a.name.localeCompare(b.name));
 
-    // Special Breeding Combination Overrides
     const SPECIAL_COMBOS = {
       "Frostallion + Helzephyr": "Frostallion Noct",
       "Relaxaurus + Sparkit": "Relaxaurus Lux",
@@ -259,58 +265,107 @@
       return closest;
     }
 
+    // BFS Pathfinding to get single-line chains from startPal to possible targets
+    function findChains(startPal, maxDepth) {
+      let paths = {};
+      let queue = [{ pal: startPal, steps: [] }];
+      paths[startPal.name] = [];
+
+      while (queue.length > 0) {
+        let { pal, steps } = queue.shift();
+
+        if (steps.length >= maxDepth) continue;
+
+        for (let wild of PALDEX) {
+          let child = getOffspring(pal, wild);
+          let newSteps = [...steps, { parent: pal, filler: wild, result: child }];
+
+          if (!paths[child.name] || newSteps.length < paths[child.name].length) {
+            paths[child.name] = newSteps;
+            queue.push({ pal: child, steps: newSteps });
+          }
+        }
+      }
+      return paths;
+    }
+
     function calculateRoutes() {
       const nameA = document.getElementById('startA').value;
       const nameB = document.getElementById('startB').value;
       const nameTarget = document.getElementById('targetPal').value;
+      const maxDepth = parseInt(document.getElementById('maxDepth').value);
 
       const palA = PALDEX.find(p => p.name === nameA);
       const palB = PALDEX.find(p => p.name === nameB);
       const target = PALDEX.find(p => p.name === nameTarget);
 
       const resultsDiv = document.getElementById('results');
-      resultsDiv.innerHTML = "";
+      resultsDiv.innerHTML = `<div class="card"><p style="color:var(--text-dim); font-size:0.9rem;">Searching multi-step graph paths...</p></div>`;
 
-      let routes = [];
+      setTimeout(() => {
+        let chainsA = findChains(palA, maxDepth);
+        let chainsB = findChains(palB, maxDepth);
 
-      for (let wildA of PALDEX) {
-        let interA = getOffspring(palA, wildA);
-        for (let wildB of PALDEX) {
-          let interB = getOffspring(palB, wildB);
-          let finalChild = getOffspring(interA, interB);
+        let validPipelines = [];
 
-          if (finalChild.name === target.name) {
-            routes.push({ wildA, interA, wildB, interB, target });
+        // Check which intermediate outputs from Chain A & Chain B cross to Target
+        for (let interA_Name in chainsA) {
+          for (let interB_Name in chainsB) {
+            let interA_Pal = PALDEX.find(p => p.name === interA_Name);
+            let interB_Pal = PALDEX.find(p => p.name === interB_Name);
+
+            let finalChild = getOffspring(interA_Pal, interB_Pal);
+
+            if (finalChild.name === target.name) {
+              validPipelines.push({
+                lineA_Steps: chainsA[interA_Name],
+                lineB_Steps: chainsB[interB_Name],
+                finalA: interA_Pal,
+                finalB: interB_Pal,
+                totalSteps: chainsA[interA_Name].length + chainsB[interB_Name].length + 1
+              });
+            }
           }
         }
-      }
 
-      if (routes.length === 0) {
-        resultsDiv.innerHTML = `<div class="card"><p style="color:var(--text-dim); font-size:0.9rem;">No 1-step 2x2 pipelines found for this specific trio. Try selecting a different starting Pal or target.</p></div>`;
-        return;
-      }
+        validPipelines.sort((a, b) => a.totalSteps - b.totalSteps);
 
-      resultsDiv.innerHTML = `<h2 style="font-size:1rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-dim); margin-bottom:12px;">Found ${routes.length} Available Pipelines</h2>`;
+        if (validPipelines.length === 0) {
+          resultsDiv.innerHTML = `<div class="card"><p style="color:var(--text-dim); font-size:0.9rem;">No pipelines found within ${maxDepth} steps. Try increasing max depth cap.</p></div>`;
+          return;
+        }
 
-      routes.slice(0, 10).forEach((r) => {
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.innerHTML = `
-          <div class="route-card">
-            <div class="line-title">Line A Step (Isolate Traits 1 & 2)</div>
-            <div class="step-text">${palA.name} × <span class="highlight">${r.wildA.name}</span> (Clean) ➔ <strong>${r.interA.name}</strong></div>
-          </div>
-          <div class="route-card">
-            <div class="line-title">Line B Step (Isolate Traits 3 & 4)</div>
-            <div class="step-text">${palB.name} × <span class="highlight">${r.wildB.name}</span> (Clean) ➔ <strong>${r.interB.name}</strong></div>
-          </div>
-          <div class="route-card" style="border-left-color: var(--accent-green);">
-            <div class="line-title" style="color: var(--accent-green);">Final Cross (Combine All 4)</div>
-            <div class="step-text">${r.interA.name} × ${r.interB.name} ➔ <span class="target-highlight">${r.target.name}</span></div>
-          </div>
-        `;
-        resultsDiv.appendChild(card);
-      });
+        resultsDiv.innerHTML = `<h2 style="font-size:1rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-dim); margin-bottom:12px;">Found ${validPipelines.length} Available Multi-Step Pipelines</h2>`;
+
+        validPipelines.slice(0, 5).forEach((p, idx) => {
+          const card = document.createElement('div');
+          card.className = 'card';
+
+          let lineAHTML = p.lineA_Steps.length === 0 
+            ? `<div class="step-text">Use <strong>${palA.name}</strong> directly (0 steps)</div>`
+            : p.lineA_Steps.map(s => `<div class="step-text">${s.parent.name} × <span class="highlight">${s.filler.name}</span> (Clean) ➔ <strong>${s.result.name}</strong></div>`).join('');
+
+          let lineBHTML = p.lineB_Steps.length === 0 
+            ? `<div class="step-text">Use <strong>${palB.name}</strong> directly (0 steps)</div>`
+            : p.lineB_Steps.map(s => `<div class="step-text">${s.parent.name} × <span class="highlight">${s.filler.name}</span> (Clean) ➔ <strong>${s.result.name}</strong></div>`).join('');
+
+          card.innerHTML = `
+            <div class="route-card">
+              <div class="line-title">Line A Steps (Isolate Traits 1 & 2)</div>
+              ${lineAHTML}
+            </div>
+            <div class="route-card">
+              <div class="line-title">Line B Steps (Isolate Traits 3 & 4)</div>
+              ${lineBHTML}
+            </div>
+            <div class="route-card" style="border-left-color: var(--accent-green);">
+              <div class="line-title" style="color: var(--accent-green);">Final Cross (Combine All 4 Traits)</div>
+              <div class="step-text">${p.finalA.name} × ${p.finalB.name} ➔ <span class="target-highlight">${target.name}</span></div>
+            </div>
+          `;
+          resultsDiv.appendChild(card);
+        });
+      }, 50);
     }
 
     window.onload = populateSelects;
