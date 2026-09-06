@@ -59,29 +59,148 @@
   <div id="results"></div>
 
   <script>
+    // Official Datamined Palworld Breeding Powers
     const PALDEX = [
       { name: "Anubis", power: 570 },
-      { name: "Incineram", power: 580 },
-      { name: "Bushi", power: 640 },
-      { name: "Relaxaurus", power: 280 },
-      { name: "Celaray", power: 850 },
-      { name: "Lamball", power: 1470 },
-      { name: "Cattiva", power: 1460 },
       { name: "Arsox", power: 790 },
-      { name: "Penking", power: 520 },
+      { name: "Astegon", power: 130 },
+      { name: "Azurobe", power: 560 },
+      { name: "Beegarde", power: 1210 },
+      { name: "Beacon", power: 220 },
+      { name: "Blazamut", power: 10 },
+      { name: "Boarush", power: 1340 },
+      { name: "Bushi", power: 640 },
+      { name: "Caprity", power: 970 },
+      { name: "Cattiva", power: 1460 },
+      { name: "Celaray", power: 850 },
       { name: "Chillet", power: 800 },
+      { name: "Cinnamoth", power: 490 },
+      { name: "Corntail", power: 1100 },
+      { name: "Daedream", power: 1230 },
+      { name: "Digtoise", power: 650 },
+      { name: "Dinossom", power: 780 },
+      { name: "Dinossom Lux", power: 770 },
+      { name: "Direhowl", power: 1060 },
+      { name: "Elphidran", power: 450 },
+      { name: "Elphidran Aqua", power: 440 },
+      { name: "Eikthyrdeer", power: 910 },
+      { name: "Eikthyrdeer Terra", power: 900 },
+      { name: "Felbat", power: 1010 },
+      { name: "Fenglope", power: 980 },
+      { name: "Flambabelle", power: 1420 },
+      { name: "Flopie", power: 1270 },
+      { name: "Foxcicle", power: 840 },
+      { name: "Foxsparks", power: 1400 },
+      { name: "Frostallion", power: 30 },
+      { name: "Frostallion Noct", power: 30 },
+      { name: "Fuack", power: 1380 },
+      { name: "Faleris", power: 120 },
+      { name: "Galeclaw", power: 930 },
+      { name: "Goblean", power: 1190 },
+      { name: "Gorirat", power: 1050 },
       { name: "Grizzbolt", power: 200 },
+      { name: "Gumoss", power: 1240 },
+      { name: "Hangyu", power: 1440 },
+      { name: "Hangyu Cryst", power: 1430 },
+      { name: "Helzephyr", power: 190 },
+      { name: "Hoocrates", power: 1390 },
+      { name: "Incineram", power: 580 },
+      { name: "Incineram Noct", power: 575 },
+      { name: "Jetragon", power: 70 },
+      { name: "Jolthog", power: 1370 },
+      { name: "Jolthog Cryst", power: 1360 },
       { name: "Jormuntide", power: 310 },
+      { name: "Jormuntide Ignis", power: 315 },
+      { name: "Katress", power: 460 },
+      { name: "Kelpsea", power: 1280 },
+      { name: "Kelpsea Ignis", power: 1290 },
+      { name: "Killamari", power: 1260 },
+      { name: "Kingpaca", power: 470 },
+      { name: "Ice Kingpaca", power: 465 },
+      { name: "Lamball", power: 1470 },
+      { name: "Leezpunk", power: 1130 },
+      { name: "Leezpunk Ignis", power: 1120 },
+      { name: "Lifmunk", power: 1430 },
+      { name: "Loomalis", power: 1180 },
+      { name: "Loupmoon", power: 950 },
+      { name: "Lovander", power: 1090 },
+      { name: "Lyleen", power: 250 },
+      { name: "Lyleen Noct", power: 240 },
+      { name: "Mammorest", power: 300 },
+      { name: "Mammorest Cryst", power: 290 },
+      { name: "Mao", power: 1320 },
+      { name: "Mao Cryst", power: 1310 },
+      { name: "Maraith", power: 1150 },
+      { name: "Melpaca", power: 1080 },
+      { name: "Menasting", power: 110 },
       { name: "Mossanda", power: 480 },
-      { name: "Caprity", power: 970 }
-    ];
+      { name: "Mossanda Lux", power: 475 },
+      { name: "Mozzarina", power: 960 },
+      { name: "Necromus", power: 60 },
+      { name: "Nox", power: 1250 },
+      { name: "Paladius", power: 80 },
+      { name: "Pengullet", power: 1350 },
+      { name: "Penking", power: 520 },
+      { name: "Petallia", power: 530 },
+      { name: "Phango", power: 1070 },
+      { name: "Pyrin", power: 380 },
+      { name: "Pyrin Noct", power: 370 },
+      { name: "Quivern", power: 330 },
+      { name: "Ragnahawk", power: 390 },
+      { name: "Rayhound", power: 740 },
+      { name: "Relaxaurus", power: 280 },
+      { name: "Relaxaurus Lux", power: 275 },
+      { name: "Reptyro", power: 320 },
+      { name: "Ice Reptyro", power: 325 },
+      { name: "Ribbuny", power: 1330 },
+      { name: "Robinquill", power: 1020 },
+      { name: "Robinquill Terra", power: 1015 },
+      { name: "Rooby", power: 1160 },
+      { name: "Rushoar", power: 1110 },
+      { name: "Shadowbeak", power: 140 },
+      { name: "Sibelyx", power: 500 },
+      { name: "Sparkit", power: 1410 },
+      { name: "Surfent", power: 550 },
+      { name: "Surfent Terra", power: 540 },
+      { name: "Swee", power: 1220 },
+      { name: "Sweepa", power: 400 },
+      { name: "Tanzee", power: 1200 },
+      { name: "Tocotoco", power: 1300 },
+      { name: "Tombat", power: 870 },
+      { name: "Trina", power: 810 },
+      { name: "Univolt", power: 680 },
+      { name: "Vanwyrm", power: 660 },
+      { name: "Vanwyrm Cryst", power: 650 },
+      { name: "Verdash", power: 610 },
+      { name: "Vaelet", power: 820 },
+      { name: "Vixy", power: 1450 },
+      { name: "Warsect", power: 340 },
+      { name: "Wumpo", power: 430 },
+      { name: "Wumpo Botan", power: 420 },
+      { name: "Woolipop", power: 1170 },
+      { name: "Wixen", power: 1140 }
+    ].sort((a, b) => a.name.localeCompare(b.name));
 
-    const SPECIAL_COMBOS = {};
+    // Game File Special Breeding Combination Overrides
+    const SPECIAL_COMBOS = {
+      "Frostallion + Helzephyr": "Frostallion Noct",
+      "Relaxaurus + Sparkit": "Relaxaurus Lux",
+      "Elphidran + Surfent": "Elphidran Aqua",
+      "Mossanda + Grizzbolt": "Mossanda Lux",
+      "Eikthyrdeer + Hangyu": "Eikthyrdeer Terra",
+      "Incineram + Maraith": "Incineram Noct",
+      "Jolthog + Pengullet": "Jolthog Cryst",
+      "Lyleen + Mossanda": "Lyleen Noct",
+      "Pyrin + Katress": "Pyrin Noct",
+      "Reptyro + Foxcicle": "Ice Reptyro",
+      "Robinquill + Faleris": "Robinquill Terra"
+    };
 
     function populateSelects() {
       const selects = ['startA', 'startB', 'targetPal'];
       selects.forEach(id => {
         const select = document.getElementById(id);
+        select.innerHTML = "";
         PALDEX.forEach(pal => {
           const opt = document.createElement('option');
           opt.value = pal.name;
@@ -96,10 +215,13 @@
     }
 
     function getOffspring(pA, pB) {
-      const key = [pA.name, pB.name].sort().join(" + ");
-      if (SPECIAL_COMBOS[key]) {
-        return PALDEX.find(p => p.name === SPECIAL_COMBOS[key]);
-      }
+      if (pA.name === pB.name) return pA;
+
+      const key1 = `${pA.name} + ${pB.name}`;
+      const key2 = `${pB.name} + ${pA.name}`;
+      if (SPECIAL_COMBOS[key1]) return PALDEX.find(p => p.name === SPECIAL_COMBOS[key1]) || pA;
+      if (SPECIAL_COMBOS[key2]) return PALDEX.find(p => p.name === SPECIAL_COMBOS[key2]) || pA;
+
       const targetPower = Math.floor((pA.power + pB.power + 1) / 2);
       let closest = PALDEX[0];
       let minDiff = Math.abs(PALDEX[0].power - targetPower);
@@ -141,13 +263,13 @@
       }
 
       if (routes.length === 0) {
-        resultsDiv.innerHTML = `<div class="card"><p style="color:var(--text-dim); font-size:0.9rem;">No 1-step 2x2 pipelines found with current test dataset. Try different starting Pals.</p></div>`;
+        resultsDiv.innerHTML = `<div class="card"><p style="color:var(--text-dim); font-size:0.9rem;">No 1-step 2x2 pipelines found for this specific trio. Try selecting a different starting Pal or target.</p></div>`;
         return;
       }
 
       resultsDiv.innerHTML = `<h2 style="font-size:1rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-dim); margin-bottom:12px;">Found ${routes.length} Available Pipelines</h2>`;
 
-      routes.slice(0, 5).forEach((r) => {
+      routes.slice(0, 10).forEach((r) => {
         const card = document.createElement('div');
         card.className = 'card';
         card.innerHTML = `
