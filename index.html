@@ -193,7 +193,7 @@
   </div>
 
   <script>
-    // Verified Datamined Palworld Roster
+    // Verified Datamined Palworld Roster (0-1500 Scale)
     const PALDEX = [
       { name: "Anubis", power: 570, id: "100" },
       { name: "Arsox", power: 790, id: "042" },
@@ -314,6 +314,7 @@
       { name: "Necromus", power: 60, id: "109" },
       { name: "Nitewing", power: 820, id: "038" },
       { name: "Nox", power: 1250, id: "021" },
+      { name: "Orserk", power: 140, id: "106" },
       { name: "Paladius", power: 80, id: "108" },
       { name: "Pengullet", power: 1350, id: "010" },
       { name: "Penking", power: 520, id: "011" },
@@ -344,6 +345,8 @@
       { name: "Sparkit", power: 1410, id: "007" },
       { name: "Surfent", power: 550, id: "065" },
       { name: "Surfent Terra", power: 540, id: "065B" },
+      { name: "Suzaku", power: 50, id: "102" },
+      { name: "Suzaku Aqua", power: 45, id: "102B" },
       { name: "Swee", power: 1220, id: "053" },
       { name: "Sweepa", power: 400, id: "054" },
       { name: "Tanzee", power: 1200, id: "008" },
@@ -369,6 +372,7 @@
     ].sort((a, b) => a.name.localeCompare(b.name));
 
     const SPECIAL_COMBOS = {
+      // Base Game Fusion & Unique Combos
       "Frostallion + Helzephyr": "Frostallion Noct",
       "Relaxaurus + Sparkit": "Relaxaurus Lux",
       "Elphidran + Surfent": "Elphidran Aqua",
@@ -380,11 +384,25 @@
       "Pyrin + Katress": "Pyrin Noct",
       "Reptyro + Foxcicle": "Ice Reptyro",
       "Robinquill + Faleris": "Robinquill Terra",
-      "Katress + Wixen": "Katress Ignis",
-      "Chillet + Goblean": "Chillet Ignis",
-      "Quivern + Dinossom": "Quivern Botan",
       "Bushi + Arsox": "Bushi Noct",
       "Gorirat + Digtoise": "Gorirat Terra",
+      "Vanwyrm + Foxcicle": "Vanwyrm Cryst",
+      "Mossanda + Petallia": "Lyleen",
+      "Grizzbolt + Relaxaurus": "Orserk",
+      "Astegon + Kitsun": "Shadowbeak",
+      "Suzaku + Relaxaurus": "Astegon",
+      "Penking + Bushi": "Anubis",
+      "Suzaku + Jormuntide": "Suzaku Aqua",
+      "Caprity + Beakon": "Caprity Noct",
+      "Celaray + Grizzbolt": "Celaray Lux",
+      "Dinossom + Rayhound": "Dinossom Lux",
+      "Fenglope + Verdash": "Fenglope Lux",
+      "Fuack + Foxsparks": "Fuack Ignis",
+      "Gobfin + Rooby": "Gobfin Ignis",
+      "Hangyu + Foxcicle": "Hangyu Cryst",
+      "Helzephyr + Beakon": "Helzephyr Lux",
+      
+      // Expansion Combos
       "Vanwyrm + Blazamut": "Braloha"
     };
 
