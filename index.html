@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PalPipeline - Palworld 2x2 Trait Solver</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card: #151d30;
+      --accent: #38bdf8;
+      --accent-green: #4ade80;
+      --text: #f8fafc;
+      --text-dim: #94a3b8;
+      --border: #24334d;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 16px; line-height: 1.5; }
+    
+    .brand { text-align: center; margin-bottom: 20px; }
+    .brand h1 { font-size: 1.8rem; letter-spacing: -0.025em; color: var(--text); }
+    .brand h1 span { color: var(--accent); }
+    .subtitle { color: var(--text-dim); font-size: 0.85rem; margin-top: 2px; }
+    
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    label { display: block; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); margin-bottom: 6px; }
+    select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: #0b0f19; color: var(--text); font-size: 1rem; margin-bottom: 14px; }
+    
+    button { width: 100%; background: var(--accent); color: #0b0f19; border: none; padding: 14px; border-radius: 8px; font-weight: 700; font-size: 1rem; cursor: pointer; transition: opacity 0.2s; }
+    button:active { opacity: 0.8; }
+
+    .route-card { background: #0b0f19; border-left: 4px solid var(--accent); padding: 12px; border-radius: 6px; margin-bottom: 10px; }
+    .line-title { font-weight: 700; color: var(--accent); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .step-text { font-size: 0.9rem; color: var(--text-dim); }
+    .highlight { color: #f43f5e; font-weight: 600; }
+    .target-highlight { color: var(--accent-green); font-weight: 700; }
+  </style>
+</head>
+<body>
+
+  <div class="brand">
+    <h1>Pal<span>Pipeline</span></h1>
+    <p class="subtitle">2x2 Trait Isolation & Cross-Breeding Engine</p>
+  </div>
+
+  <div class="card">
+    <label for="startA">Line A Parent (Traits 1 & 2)</label>
+    <select id="startA"></select>
+
+    <label for="startB">Line B Parent (Traits 3 & 4)</label>
+    <select id="startB"></select>
+
+    <label for="targetPal">Target Pal (Final Goal)</label>
+    <select id="targetPal"></select>
+
+    <button onclick="calculateRoutes()">Build 2x2 Pipeline</button>
+  </div>
+
+  <div id="results"></div>
+
+  <script>
+    const PALDEX = [
+      { name: "Anubis", power: 570 },
+      { name: "Incineram", power: 580 },
+      { name: "Bushi", power: 640 },
+      { name: "Relaxaurus", power: 280 },
+      { name: "Celaray", power: 850 },
+      { name: "Lamball", power: 1470 },
+      { name: "Cattiva", power: 1460 },
+      { name: "Arsox", power: 790 },
+      { name: "Penking", power: 520 },
+      { name: "Chillet", power: 800 },
+      { name: "Grizzbolt", power: 200 },
+      { name: "Jormuntide", power: 310 },
+      { name: "Mossanda", power: 480 },
+      { name: "Caprity", power: 970 }
+    ];
+
+    const SPECIAL_COMBOS = {};
+
+    function populateSelects() {
+      const selects = ['startA', 'startB', 'targetPal'];
+      selects.forEach(id => {
+        const select = document.getElementById(id);
+        PALDEX.forEach(pal => {
+          const opt = document.createElement('option');
+          opt.value = pal.name;
+          opt.textContent = `${pal.name} (Power: ${pal.power})`;
+          select.appendChild(opt);
+        });
+      });
+
+      document.getElementById('startA').value = "Relaxaurus";
+      document.getElementById('startB').value = "Celaray";
+      document.getElementById('targetPal').value = "Anubis";
+    }
+
+    function getOffspring(pA, pB) {
+      const key = [pA.name, pB.name].sort().join(" + ");
+      if (SPECIAL_COMBOS[key]) {
+        return PALDEX.find(p => p.name === SPECIAL_COMBOS[key]);
+      }
+      const targetPower = Math.floor((pA.power + pB.power + 1) / 2);
+      let closest = PALDEX[0];
+      let minDiff = Math.abs(PALDEX[0].power - targetPower);
+
+      for (const pal of PALDEX) {
+        const diff = Math.abs(pal.power - targetPower);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closest = pal;
+        }
+      }
+      return closest;
+    }
+
+    function calculateRoutes() {
+      const nameA = document.getElementById('startA').value;
+      const nameB = document.getElementById('startB').value;
+      const nameTarget = document.getElementById('targetPal').value;
+
+      const palA = PALDEX.find(p => p.name === nameA);
+      const palB = PALDEX.find(p => p.name === nameB);
+      const target = PALDEX.find(p => p.name === nameTarget);
+
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = "";
+
+      let routes = [];
+
+      for (let wildA of PALDEX) {
+        let interA = getOffspring(palA, wildA);
+        for (let wildB of PALDEX) {
+          let interB = getOffspring(palB, wildB);
+          let finalChild = getOffspring(interA, interB);
+
+          if (finalChild.name === target.name) {
+            routes.push({ wildA, interA, wildB, interB, target });
+          }
+        }
+      }
+
+      if (routes.length === 0) {
+        resultsDiv.innerHTML = `<div class="card"><p style="color:var(--text-dim); font-size:0.9rem;">No 1-step 2x2 pipelines found with current test dataset. Try different starting Pals.</p></div>`;
+        return;
+      }
+
+      resultsDiv.innerHTML = `<h2 style="font-size:1rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-dim); margin-bottom:12px;">Found ${routes.length} Available Pipelines</h2>`;
+
+      routes.slice(0, 5).forEach((r) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <div class="route-card">
+            <div class="line-title">Line A Step (Isolate Traits 1 & 2)</div>
+            <div class="step-text">${palA.name} × <span class="highlight">${r.wildA.name}</span> (Clean) ➔ <strong>${r.interA.name}</strong></div>
+          </div>
+          <div class="route-card">
+            <div class="line-title">Line B Step (Isolate Traits 3 & 4)</div>
+            <div class="step-text">${palB.name} × <span class="highlight">${r.wildB.name}</span> (Clean) ➔ <strong>${r.interB.name}</strong></div>
+          </div>
+          <div class="route-card" style="border-left-color: var(--accent-green);">
+            <div class="line-title" style="color: var(--accent-green);">Final Cross (Combine All 4)</div>
+            <div class="step-text">${r.interA.name} × ${r.interB.name} ➔ <span class="target-highlight">${r.target.name}</span></div>
+          </div>
+        `;
+        resultsDiv.appendChild(card);
+      });
+    }
+
+    window.onload = populateSelects;
+  </script>
+</body>
+</html>
