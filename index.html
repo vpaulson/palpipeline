@@ -29,6 +29,7 @@
     
     button.calc-btn { width: 100%; background: var(--accent); color: #0b0f19; border: none; padding: 14px; border-radius: 8px; font-weight: 700; font-size: 1rem; cursor: pointer; transition: opacity 0.2s; }
     button.calc-btn:active { opacity: 0.8; }
+    button.calc-btn:disabled { background: var(--border); color: var(--text-dim); cursor: not-allowed; }
 
     /* Excluded Chips Bar */
     .exclude-box { margin-bottom: 14px; }
@@ -72,6 +73,28 @@
     }
     .pal-link.highlight { border-color: #f43f5e; color: #f43f5e; }
     .pal-link.target-highlight { border-color: var(--accent-green); color: var(--accent-green); }
+
+    /* Error Message Box */
+    .error-card {
+      background: rgba(244, 63, 94, 0.1);
+      border: 1px solid var(--accent-red);
+      color: #fca5a5;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .error-card h3 { color: #f43f5e; margin-bottom: 8px; font-size: 1.1rem; }
+    .error-card p { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 12px; }
+    .retry-btn {
+      background: var(--accent-red);
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 700;
+      cursor: pointer;
+    }
 
     /* Modal Styling */
     .modal-overlay {
@@ -145,34 +168,36 @@
     <p class="subtitle">Multi-Step 2x2 Trait Isolation & Cross-Breeding Engine</p>
   </div>
 
-  <div class="card">
-    <label for="startA">Line A Parent (Traits 1 & 2)</label>
-    <select id="startA"><option>Loading dataset...</option></select>
+  <div id="mainContainer">
+    <div class="card">
+      <label for="startA">Line A Parent (Traits 1 & 2)</label>
+      <select id="startA" disabled><option>Loading dataset...</option></select>
 
-    <label for="startB">Line B Parent (Traits 3 & 4)</label>
-    <select id="startB"><option>Loading dataset...</option></select>
+      <label for="startB">Line B Parent (Traits 3 & 4)</label>
+      <select id="startB" disabled><option>Loading dataset...</option></select>
 
-    <label for="targetPal">Target Pal (Final Goal)</label>
-    <select id="targetPal"><option>Loading dataset...</option></select>
+      <label for="targetPal">Target Pal (Final Goal)</label>
+      <select id="targetPal" disabled><option>Loading dataset...</option></select>
 
-    <label for="maxDepth">Max Chain Depth (Safety Cap)</label>
-    <select id="maxDepth">
-      <option value="2">2 Steps Max</option>
-      <option value="3">3 Steps Max</option>
-      <option value="4" selected>4 Steps Max (Recommended)</option>
-      <option value="6">6 Steps Max</option>
-    </select>
-
-    <div class="exclude-box">
-      <label>Add Pal To Exclude List</label>
-      <select id="excludeSelect" onchange="manualExclude(this.value)">
-        <option value="">-- Select Pal to Exclude --</option>
+      <label for="maxDepth">Max Chain Depth (Safety Cap)</label>
+      <select id="maxDepth">
+        <option value="2">2 Steps Max</option>
+        <option value="3">3 Steps Max</option>
+        <option value="4" selected>4 Steps Max (Recommended)</option>
+        <option value="6">6 Steps Max</option>
       </select>
-      
-      <div id="chipContainer" class="chip-container"></div>
-    </div>
 
-    <button class="calc-btn" onclick="calculateRoutes()">Build Multi-Step Pipeline</button>
+      <div class="exclude-box">
+        <label>Add Pal To Exclude List</label>
+        <select id="excludeSelect" onchange="manualExclude(this.value)" disabled>
+          <option value="">-- Dataset not loaded --</option>
+        </select>
+        
+        <div id="chipContainer" class="chip-container"></div>
+      </div>
+
+      <button id="calcBtn" class="calc-btn" onclick="calculateRoutes()" disabled>Build Multi-Step Pipeline</button>
+    </div>
   </div>
 
   <div id="results"></div>
@@ -198,18 +223,27 @@
     let excludedPals = new Set();
     let currentActivePalName = "";
 
-    // Fetch datasets dynamically from a version-controlled repo source
     async function initializeApp() {
+      const selects = ['startA', 'startB', 'targetPal', 'excludeSelect'];
+      selects.forEach(id => {
+        const sel = document.getElementById(id);
+        sel.innerHTML = '<option>Loading dataset...</option>';
+        sel.disabled = true;
+      });
+      document.getElementById('calcBtn').disabled = true;
+      
+      const existingError = document.getElementById('errorContainer');
+      if (existingError) existingError.remove();
+
       try {
-        // Example pulling from a clean JSON endpoint mirror
         const response = await fetch('https://raw.githubusercontent.com/mlg404/palworld-paldex-api/main/src/breeding.json');
         
-        if (!response.ok) throw new Error("Network response failed");
+        if (!response.ok) {
+          throw new Error(`HTTP Error Status: ${response.status} (${response.statusText})`);
+        }
         
         const rawData = await response.json();
         
-        // Normalize structure depending on JSON schema formatting
-        // (Assuming standard array or object mapping)
         PALDEX = (rawData.pals || rawData).map(p => ({
           name: p.name,
           power: p.breedingPower ?? p.power,
@@ -218,18 +252,38 @@
 
         SPECIAL_COMBOS = rawData.combos || {};
 
-      } catch (err) {
-        console.warn("External fetch failed, falling back to local dataset safety net.", err);
-        // Fallback minimal structure if offline/blocked by CORS
-        PALDEX = [
-          { name: "Anubis", power: 570, id: "100" },
-          { name: "Relaxaurus", power: 280, id: "085" },
-          { name: "Celaray", power: 850, id: "025" }
-        ];
-        SPECIAL_COMBOS = { "Relaxaurus + Sparkit": "Relaxaurus Lux" };
-      }
+        if (PALDEX.length === 0) {
+          throw new Error("Dataset loaded successfully, but the Pal roster is empty.");
+        }
 
-      populateSelects();
+        populateSelects();
+        
+        selects.forEach(id => document.getElementById(id).disabled = false);
+        document.getElementById('calcBtn').disabled = false;
+
+      } catch (err) {
+        console.error("Failed to load official dataset:", err);
+        displayLoadError(err.message);
+      }
+    }
+
+    function displayLoadError(errorMessage) {
+      const selects = ['startA', 'startB', 'targetPal', 'excludeSelect'];
+      selects.forEach(id => {
+        const sel = document.getElementById(id);
+        sel.innerHTML = '<option value="">-- Failed to Load --</option>';
+        sel.disabled = true;
+      });
+
+      const errorHTML = `
+        <div id="errorContainer" class="error-card">
+          <h3>Failed to Load Palworld Datapack</h3>
+          <p>Could not fetch version-controlled JSON definitions. Details: <strong>${errorMessage}</strong></p>
+          <button class="retry-btn" onclick="initializeApp()">Retry Loading</button>
+        </div>
+      `;
+      
+      document.getElementById('mainContainer').insertAdjacentHTML('beforebegin', errorHTML);
     }
 
     function populateSelects() {
@@ -237,6 +291,8 @@
       selects.forEach(id => {
         const select = document.getElementById(id);
         if (id !== 'excludeSelect') select.innerHTML = "";
+        else select.innerHTML = '<option value="">-- Select Pal to Exclude --</option>';
+        
         PALDEX.forEach(pal => {
           const opt = document.createElement('option');
           opt.value = pal.name;
