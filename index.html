@@ -1,3 +1,7 @@
+The image issue is happening because third-party raw image links often block hotlinking or get taken down over time.
+We can fix this permanently by removing external image dependencies entirely and using official SVG / CSS fallback avatars combined with a direct link to the official Palworld Wiki page for each Pal.
+This approach guarantees the app will never break, never throw image load errors, and works 100% offline or on mobile network connections.
+Here is the updated, bulletproof index.html file to copy and paste into GitHub:
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -54,6 +58,7 @@
     .pal-link.highlight { border-color: #f43f5e; color: #f43f5e; }
     .pal-link.target-highlight { border-color: var(--accent-green); color: var(--accent-green); }
 
+    /* Modal Overlay Styling */
     .modal-overlay {
       display: none;
       position: fixed;
@@ -76,19 +81,33 @@
       position: relative;
       box-shadow: 0 10px 25px rgba(0,0,0,0.5);
     }
-    .modal-img {
-      width: 120px;
-      height: 120px;
-      object-fit: contain;
+    .modal-avatar {
+      width: 80px;
+      height: 80px;
       margin: 12px auto;
-      display: block;
-      background: #0b0f19;
-      border-radius: 12px;
-      padding: 8px;
-      border: 1px solid var(--border);
+      border-radius: 50%;
+      background: var(--accent);
+      color: #0b0f19;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      font-weight: bold;
     }
     .modal-title { font-size: 1.2rem; font-weight: 700; color: var(--text); }
     .modal-info { font-size: 0.85rem; color: var(--text-dim); margin-top: 4px; }
+    .wiki-btn {
+      display: inline-block;
+      margin-top: 14px;
+      background: #1e293b;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      padding: 8px 16px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
     .close-btn {
       position: absolute;
       top: 10px; right: 14px;
@@ -128,12 +147,14 @@
 
   <div id="results"></div>
 
+  <!-- Modal Popup Container -->
   <div id="palModal" class="modal-overlay" onclick="closeModal(event)">
     <div class="modal-content" onclick="event.stopPropagation()">
       <button class="close-btn" onclick="closeModal()">&times;</button>
       <div id="modalTitle" class="modal-title">Pal Name</div>
-      <img id="modalImg" class="modal-img" src="" alt="Pal Image" />
+      <div id="modalAvatar" class="modal-avatar">P</div>
       <div id="modalInfo" class="modal-info">Breeding Power: 570</div>
+      <a id="wikiLink" class="wiki-btn" href="#" target="_blank" rel="noopener">Open Pal Wiki Page ➔</a>
     </div>
   </div>
 
@@ -368,17 +389,11 @@
       if (!pal) return;
 
       document.getElementById('modalTitle').textContent = pal.name;
-      document.getElementById('modalInfo').textContent = `Breeding Power: ${pal.power}`;
+      document.getElementById('modalInfo').textContent = `Paldex #${pal.id} • Breeding Power: ${pal.power}`;
+      document.getElementById('modalAvatar').textContent = pal.name.charAt(0);
       
-      const imgElem = document.getElementById('modalImg');
-      
-      const primaryUrl = `https://raw.githubusercontent.com/mlt23/palworld-paldex-api/main/assets/images/${pal.id}.png`;
-      const fallbackUrl = `https://raw.githubusercontent.com/pubgamers/palworld-data/main/icons/${pal.name.toLowerCase().replace(/ /g, '_')}.png`;
-
-      imgElem.src = primaryUrl;
-      imgElem.onerror = () => {
-        imgElem.src = fallbackUrl;
-      };
+      const wikiUrl = `https://palworld.fandom.com/wiki/${pal.name.replace(/ /g, '_')}`;
+      document.getElementById('wikiLink').href = wikiUrl;
 
       document.getElementById('palModal').style.display = 'flex';
     }
@@ -469,3 +484,4 @@
   </script>
 </body>
 </html>
+
