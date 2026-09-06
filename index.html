@@ -193,7 +193,7 @@
   </div>
 
   <script>
-    // Verified Datamined Palworld Roster (All Hallucinated Entries Removed)
+    // Verified Datamined Palworld Roster
     const PALDEX = [
       { name: "Anubis", power: 570, id: "100" },
       { name: "Arsox", power: 790, id: "042" },
@@ -447,17 +447,19 @@
       if (SPECIAL_COMBOS[key2]) return PALDEX.find(p => p.name === SPECIAL_COMBOS[key2]) || pA;
 
       const targetPower = Math.floor((pA.power + pB.power + 1) / 2);
-      let closest = PALDEX[0];
+      
+      let closestPal = PALDEX[0];
       let minDiff = Math.abs(PALDEX[0].power - targetPower);
 
       for (const pal of PALDEX) {
         const diff = Math.abs(pal.power - targetPower);
-        if (diff < minDiff) {
+        
+        if (diff < minDiff || (diff === minDiff && pal.power < closestPal.power)) {
           minDiff = diff;
-          closest = pal;
+          closestPal = pal;
         }
       }
-      return closest;
+      return closestPal;
     }
 
     function findChains(startPal, maxDepth) {
