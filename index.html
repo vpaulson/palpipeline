@@ -1,7 +1,3 @@
-The image issue is happening because third-party raw image links often block hotlinking or get taken down over time.
-We can fix this permanently by removing external image dependencies entirely and using official SVG / CSS fallback avatars combined with a direct link to the official Palworld Wiki page for each Pal.
-This approach guarantees the app will never break, never throw image load errors, and works 100% offline or on mobile network connections.
-Here is the updated, bulletproof index.html file to copy and paste into GitHub:
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,6 +10,7 @@ Here is the updated, bulletproof index.html file to copy and paste into GitHub:
       --card: #151d30;
       --accent: #38bdf8;
       --accent-green: #4ade80;
+      --accent-red: #f43f5e;
       --text: #f8fafc;
       --text-dim: #94a3b8;
       --border: #24334d;
@@ -32,6 +29,24 @@ Here is the updated, bulletproof index.html file to copy and paste into GitHub:
     
     button.calc-btn { width: 100%; background: var(--accent); color: #0b0f19; border: none; padding: 14px; border-radius: 8px; font-weight: 700; font-size: 1rem; cursor: pointer; transition: opacity 0.2s; }
     button.calc-btn:active { opacity: 0.8; }
+
+    /* Excluded Chips Bar */
+    .exclude-box { margin-bottom: 14px; }
+    .chip-container { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; min-height: 24px; }
+    .chip {
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid var(--accent-red);
+      color: #fca5a5;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 16px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .chip-remove { cursor: pointer; font-weight: bold; font-size: 1rem; line-height: 1; }
+    .chip-remove:hover { color: #fff; }
 
     .route-card { background: #0b0f19; border-left: 4px solid var(--accent); padding: 12px; border-radius: 6px; margin-bottom: 10px; }
     .line-title { font-weight: 700; color: var(--accent); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
@@ -58,7 +73,7 @@ Here is the updated, bulletproof index.html file to copy and paste into GitHub:
     .pal-link.highlight { border-color: #f43f5e; color: #f43f5e; }
     .pal-link.target-highlight { border-color: var(--accent-green); color: var(--accent-green); }
 
-    /* Modal Overlay Styling */
+    /* Modal Styling */
     .modal-overlay {
       display: none;
       position: fixed;
@@ -96,18 +111,24 @@ Here is the updated, bulletproof index.html file to copy and paste into GitHub:
     }
     .modal-title { font-size: 1.2rem; font-weight: 700; color: var(--text); }
     .modal-info { font-size: 0.85rem; color: var(--text-dim); margin-top: 4px; }
-    .wiki-btn {
-      display: inline-block;
-      margin-top: 14px;
-      background: #1e293b;
-      color: var(--accent);
-      border: 1px solid var(--accent);
-      padding: 8px 16px;
+    
+    .modal-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+    
+    .action-btn {
+      display: block;
+      width: 100%;
+      padding: 10px;
       border-radius: 8px;
       text-decoration: none;
       font-size: 0.85rem;
-      font-weight: 600;
+      font-weight: 700;
+      cursor: pointer;
+      border: 1px solid transparent;
     }
+    .action-btn.wiki { background: #1e293b; color: var(--accent); border-color: var(--accent); }
+    .action-btn.exclude { background: rgba(244, 63, 94, 0.15); color: var(--accent-red); border-color: var(--accent-red); }
+    .action-btn.exclude:active { background: var(--accent-red); color: #fff; }
+
     .close-btn {
       position: absolute;
       top: 10px; right: 14px;
@@ -142,6 +163,15 @@ Here is the updated, bulletproof index.html file to copy and paste into GitHub:
       <option value="6">6 Steps Max</option>
     </select>
 
+    <div class="exclude-box">
+      <label>Add Pal To Exclude List</label>
+      <select id="excludeSelect" onchange="manualExclude(this.value)">
+        <option value="">-- Select Pal to Exclude --</option>
+      </select>
+      
+      <div id="chipContainer" class="chip-container"></div>
+    </div>
+
     <button class="calc-btn" onclick="calculateRoutes()">Build Multi-Step Pipeline</button>
   </div>
 
@@ -154,7 +184,11 @@ Here is the updated, bulletproof index.html file to copy and paste into GitHub:
       <div id="modalTitle" class="modal-title">Pal Name</div>
       <div id="modalAvatar" class="modal-avatar">P</div>
       <div id="modalInfo" class="modal-info">Breeding Power: 570</div>
-      <a id="wikiLink" class="wiki-btn" href="#" target="_blank" rel="noopener">Open Pal Wiki Page ➔</a>
+
+      <div class="modal-actions">
+        <button id="excludeModalBtn" class="action-btn exclude" onclick="excludeCurrentPal()">🚫 Exclude From Search</button>
+        <a id="wikiLink" class="action-btn wiki" href="#" target="_blank" rel="noopener">Open Pal Wiki Page ➔</a>
+      </div>
     </div>
   </div>
 
@@ -317,11 +351,14 @@ Here is the updated, bulletproof index.html file to copy and paste into GitHub:
       "Gorirat + Digtoise": "Gorirat Terra"
     };
 
+    let excludedPals = new Set();
+    let currentActivePalName = "";
+
     function populateSelects() {
-      const selects = ['startA', 'startB', 'targetPal'];
+      const selects = ['startA', 'startB', 'targetPal', 'excludeSelect'];
       selects.forEach(id => {
         const select = document.getElementById(id);
-        select.innerHTML = "";
+        if (id !== 'excludeSelect') select.innerHTML = "";
         PALDEX.forEach(pal => {
           const opt = document.createElement('option');
           opt.value = pal.name;
@@ -333,6 +370,37 @@ Here is the updated, bulletproof index.html file to copy and paste into GitHub:
       document.getElementById('startA').value = "Relaxaurus";
       document.getElementById('startB').value = "Celaray";
       document.getElementById('targetPal').value = "Anubis";
+    }
+
+    function addExclusion(palName) {
+      if (!palName || excludedPals.has(palName)) return;
+      excludedPals.add(palName);
+      renderExclusionChips();
+      calculateRoutes();
+    }
+
+    function removeExclusion(palName) {
+      excludedPals.delete(palName);
+      renderExclusionChips();
+      calculateRoutes();
+    }
+
+    function manualExclude(palName) {
+      if (palName) {
+        addExclusion(palName);
+        document.getElementById('excludeSelect').value = "";
+      }
+    }
+
+    function renderExclusionChips() {
+      const container = document.getElementById('chipContainer');
+      container.innerHTML = "";
+      excludedPals.forEach(name => {
+        const chip = document.createElement('div');
+        chip.className = 'chip';
+        chip.innerHTML = `${name} <span class="chip-remove" onclick="removeExclusion('${name}')">&times;</span>`;
+        container.appendChild(chip);
+      });
     }
 
     function getOffspring(pA, pB) {
@@ -368,7 +436,14 @@ Here is the updated, bulletproof index.html file to copy and paste into GitHub:
         if (steps.length >= maxDepth) continue;
 
         for (let wild of PALDEX) {
+          // Skip if filler is explicitly excluded
+          if (excludedPals.has(wild.name)) continue;
+
           let child = getOffspring(pal, wild);
+          
+          // Skip if intermediate result is explicitly excluded
+          if (excludedPals.has(child.name)) continue;
+
           let newSteps = [...steps, { parent: pal, filler: wild, result: child }];
 
           if (!paths[child.name] || newSteps.length < paths[child.name].length) {
@@ -388,6 +463,8 @@ Here is the updated, bulletproof index.html file to copy and paste into GitHub:
       const pal = PALDEX.find(p => p.name === palName);
       if (!pal) return;
 
+      currentActivePalName = palName;
+
       document.getElementById('modalTitle').textContent = pal.name;
       document.getElementById('modalInfo').textContent = `Paldex #${pal.id} • Breeding Power: ${pal.power}`;
       document.getElementById('modalAvatar').textContent = pal.name.charAt(0);
@@ -396,6 +473,13 @@ Here is the updated, bulletproof index.html file to copy and paste into GitHub:
       document.getElementById('wikiLink').href = wikiUrl;
 
       document.getElementById('palModal').style.display = 'flex';
+    }
+
+    function excludeCurrentPal() {
+      if (currentActivePalName) {
+        addExclusion(currentActivePalName);
+        closeModal();
+      }
     }
 
     function closeModal() {
@@ -443,7 +527,7 @@ Here is the updated, bulletproof index.html file to copy and paste into GitHub:
         validPipelines.sort((a, b) => a.totalSteps - b.totalSteps);
 
         if (validPipelines.length === 0) {
-          resultsDiv.innerHTML = `<div class="card"><p style="color:var(--text-dim); font-size:0.9rem;">No pipelines found within ${maxDepth} steps. Try increasing max depth cap.</p></div>`;
+          resultsDiv.innerHTML = `<div class="card"><p style="color:var(--text-dim); font-size:0.9rem;">No pipelines found within ${maxDepth} steps using current filter/exclusion settings.</p></div>`;
           return;
         }
 
@@ -484,4 +568,3 @@ Here is the updated, bulletproof index.html file to copy and paste into GitHub:
   </script>
 </body>
 </html>
-
