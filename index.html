@@ -34,6 +34,79 @@
     /* Excluded Chips Bar */
     .exclude-box { margin-bottom: 14px; }
     .chip-container { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; min-height: 24px; }
+
+    .power-range-box { margin-bottom: 14px; }
+    .power-range-help { font-size: 0.78rem; color: var(--text-dim); margin: 2px 0 10px; line-height: 1.4; }
+    .power-range-readout {
+      text-align: center;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    .dual-slider {
+      position: relative;
+      height: 28px;
+      margin: 0 4px;
+    }
+    .dual-slider-fill {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      height: 4px;
+      border-radius: 2px;
+      background: var(--accent);
+      pointer-events: none;
+    }
+    .dual-slider-input {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 28px;
+      margin: 0;
+      background: transparent;
+      -webkit-appearance: none;
+      appearance: none;
+      pointer-events: none;
+    }
+    /* The track itself (drawn once, behind the fill) */
+    .dual-slider-input::-webkit-slider-runnable-track {
+      -webkit-appearance: none;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+    }
+    .dual-slider-input::-moz-range-track {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+    }
+    /* Thumbs need pointer events even though the input itself doesn't, so
+       drag/click only lands on the visible handle, not the full-width track -
+       this is what lets two overlapping sliders coexist without one
+       swallowing all the clicks meant for the other. */
+    .dual-slider-input::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      pointer-events: auto;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid #0b0f19;
+      cursor: pointer;
+      margin-top: -7px;
+    }
+    .dual-slider-input::-moz-range-thumb {
+      pointer-events: auto;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid #0b0f19;
+      cursor: pointer;
+    }
+    .dual-slider-input:disabled::-webkit-slider-thumb { background: var(--text-dim); cursor: not-allowed; }
+    .dual-slider-input:disabled::-moz-range-thumb { background: var(--text-dim); cursor: not-allowed; }
     .chip {
       background: rgba(244, 63, 94, 0.15);
       border: 1px solid var(--accent-red);
@@ -48,6 +121,22 @@
     }
     .chip-remove { cursor: pointer; font-weight: bold; font-size: 1rem; line-height: 1; }
     .chip-remove:hover { color: #fff; }
+    .chip-include {
+      background: rgba(74, 222, 128, 0.15);
+      border-color: var(--accent-green);
+      color: #86efac;
+    }
+    .match-badge {
+      display: inline-block;
+      background: rgba(74, 222, 128, 0.15);
+      border: 1px solid var(--accent-green);
+      color: #86efac;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 12px;
+      margin: 0 0 8px;
+    }
 
     .route-card { background: #0b0f19; border-left: 4px solid var(--accent); padding: 12px; border-radius: 6px; margin-bottom: 10px; }
     .line-title { font-weight: 700; color: var(--accent); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
@@ -64,8 +153,16 @@
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
       text-decoration: none;
+    }
+    .pal-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      object-fit: cover;
+      background: #0b0f19;
+      flex-shrink: 0;
     }
     .pal-link:hover, .pal-link:active {
       border-color: var(--accent);
@@ -131,6 +228,12 @@
       justify-content: center;
       font-size: 2rem;
       font-weight: bold;
+      overflow: hidden;
+    }
+    .modal-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
     }
     .modal-title { font-size: 1.2rem; font-weight: 700; color: var(--text); }
     .modal-info { font-size: 0.85rem; color: var(--text-dim); margin-top: 4px; }
@@ -168,24 +271,35 @@
     <p class="subtitle">Multi-Step 2x2 Trait Isolation & Cross-Breeding Engine</p>
   </div>
 
+  <div id="dataSourceLine" style="text-align:center; margin: -8px 0 12px; font-size:0.75rem; color:var(--text-dim);"></div>
+
   <div id="mainContainer">
     <div class="card">
       <label for="startA">Line A Parent (Traits 1 & 2)</label>
-      <select id="startA" disabled><option>Loading dataset...</option></select>
+      <select id="startA" disabled onchange="syncURL()"><option>Loading dataset...</option></select>
 
       <label for="startB">Line B Parent (Traits 3 & 4)</label>
-      <select id="startB" disabled><option>Loading dataset...</option></select>
+      <select id="startB" disabled onchange="syncURL()"><option>Loading dataset...</option></select>
 
       <label for="targetPal">Target Pal (Final Goal)</label>
-      <select id="targetPal" disabled><option>Loading dataset...</option></select>
+      <select id="targetPal" disabled onchange="syncURL()"><option>Loading dataset...</option></select>
 
       <label for="maxDepth">Max Chain Depth (Safety Cap)</label>
-      <select id="maxDepth">
+      <select id="maxDepth" onchange="syncURL()">
         <option value="2">2 Steps Max</option>
         <option value="3">3 Steps Max</option>
         <option value="4" selected>4 Steps Max (Recommended)</option>
         <option value="6">6 Steps Max</option>
       </select>
+
+      <div class="exclude-box">
+        <label>Add Pal To Include List (ranks paths that use them as filler higher)</label>
+        <select id="includeSelect" onchange="manualInclude(this.value)" disabled>
+          <option value="">-- Dataset not loaded --</option>
+        </select>
+
+        <div id="includeChipContainer" class="chip-container"></div>
+      </div>
 
       <div class="exclude-box">
         <label>Add Pal To Exclude List</label>
@@ -195,6 +309,18 @@
         
         <div id="chipContainer" class="chip-container"></div>
       </div>
+
+      <div class="power-range-box">
+        <label>Filler Breeding Power Range</label>
+        <p class="power-range-help">Limits which Pals can be used as the external filler in each breeding step, by breeding power (note: rarer/stronger Pals have LOWER power numbers, so raise the floor to exclude rare Pals, lower the ceiling to exclude common ones). Your chosen Line A/B parents, target, and any bred intermediate steps are never affected by this.</p>
+        <div class="power-range-readout" id="powerRangeReadout">-- to --</div>
+        <div class="dual-slider" id="dualSliderTrack">
+          <div class="dual-slider-fill" id="dualSliderFill"></div>
+          <input type="range" id="powerFloor" class="dual-slider-input" disabled>
+          <input type="range" id="powerCeiling" class="dual-slider-input" disabled>
+        </div>
+      </div>
+      <div id="urlShareNote" style="font-size:0.72rem; color:var(--text-dim); margin: -10px 0 14px; text-align:center;">Your selections are reflected in the page URL - copy it to share this exact setup.</div>
 
       <button id="calcBtn" class="calc-btn" onclick="calculateRoutes()" disabled>Build Multi-Step Pipeline</button>
     </div>
@@ -220,57 +346,314 @@
   <script>
     let PALDEX = [];
     let SPECIAL_COMBOS = {};
+    let PAL_IMAGES = {};
     let excludedPals = new Set();
+    let includedPals = new Set();
     let currentActivePalName = "";
 
-    async function initializeApp() {
-      const selects = ['startA', 'startB', 'targetPal', 'excludeSelect'];
+    // Palworld Atlas Data: auto-refreshed static JSON extracted directly from
+    // the dedicated server files (no server to run, no CORS setup needed).
+    // https://github.com/Awy64/palworld-atlas-data
+    //
+    // Confirmed layout (from an actual exported build):
+    //   v1/latest.json            -> { buildPath, steamBuildId, ... }
+    //   v1/<buildPath>/manifest.json
+    //   v1/<buildPath>/pals/index.json   -> { records: [ {id, tribe, name, paldexNumber, breedingRank, ...} ] }
+    //   v1/<buildPath>/breeding.json     -> { sameSpeciesProducesSelf, uniquePairs: [{parentAId, parentBId, childId, parentAGender?, parentBGender?}] }
+    //
+    // Notes on the data:
+    // - "id"/"tribe" in these files are internal codenames (e.g. "LazyDragon"
+    //   for Relaxaurus), not the display name. We always match breeding.json's
+    //   parent/child references against the "tribe" field, since that's what
+    //   the source table (DT_PalCombiUnique) actually stores - a couple of
+    //   pals have an id/tribe casing mismatch (e.g. BluePlatypus/Blueplatypus).
+    // - breeding.json references a handful of tribes (mostly "Yakushima*" and
+    //   a few cut/placeholder codenames) that don't exist in pals/index.json.
+    //   Those are old or unreleased content and are silently skipped.
+    // - There's no exposed tiebreaker field for when two species land equally
+    //   close to the averaged breeding power (the game's real internal field,
+    //   "CombiDuplicatePriority", isn't in this export). This is NOT a rare
+    //   edge case - roughly half of all possible parent pairs land on an
+    //   exact tie, since breeding power values are sparse relative to the
+    //   range of possible averages. See the tie-break rule and its
+    //   reasoning in getOffspring() below.
+    const ATLAS_ROOT = 'https://awy64.github.io/palworld-atlas-data';
+    const CACHE_KEY = 'palpipeline_atlas_cache_v1';
+
+    async function fetchJson(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+      return res.json();
+    }
+
+    function readCache() {
+      try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch (err) {
+        console.warn('[PalPipeline] Could not read cache:', err);
+        return null;
+      }
+    }
+
+    function writeCache(entry) {
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(entry));
+      } catch (err) {
+        console.warn('[PalPipeline] Could not write cache (storage full/disabled?):', err);
+      }
+    }
+
+    // Always does one cheap fetch (latest.json is a few bytes) to find the
+    // current build id. Only re-downloads pals/index.json + breeding.json -
+    // the two larger files - when that build id doesn't match what's cached,
+    // or when forceRefresh is requested. Falls back to a stale cache if the
+    // network is unreachable at all (e.g. offline), so the app still works.
+    async function loadAtlasData(forceRefresh = false) {
+      const cached = readCache();
+
+      let pointer;
+      try {
+        pointer = await fetchJson(`${ATLAS_ROOT}/v1/latest.json`);
+      } catch (err) {
+        if (cached) {
+          console.warn('[PalPipeline] Could not reach Atlas (offline?); using cached build', cached.steamBuildId);
+          return { ...cached, fromCache: true, offline: true };
+        }
+        throw err;
+      }
+
+      const buildPath = pointer.buildPath;
+      if (!buildPath) throw new Error('Atlas pointer file did not include a buildPath.');
+
+      if (!forceRefresh && cached && cached.steamBuildId === pointer.steamBuildId) {
+        console.log('[PalPipeline] Using cached data, build', cached.steamBuildId, 'is current');
+        return { ...cached, fromCache: true, offline: false };
+      }
+
+      const base = `${ATLAS_ROOT}/v1/${buildPath}`;
+      const [palsData, breedingData] = await Promise.all([
+        fetchJson(`${base}/pals/index.json`),
+        fetchJson(`${base}/breeding.json`)
+      ]);
+
+      const entry = { steamBuildId: pointer.steamBuildId, palsData, breedingData, cachedAt: Date.now() };
+      writeCache(entry);
+      console.log('[PalPipeline] Fetched fresh data, build', pointer.steamBuildId);
+      return { ...entry, fromCache: false, offline: false };
+    }
+
+    // Builds the "NameA + NameB" -> child-name override table from
+    // breeding.json's uniquePairs, using pals/index.json's tribe->name map to
+    // resolve internal codenames to display names. Skips pairs referencing
+    // tribes we don't have a Pal record for, and the trivial "same species
+    // breeds itself" rows (already covered by sameSpeciesProducesSelf).
+    // A pair can appear twice under the same key when the outcome depends on
+    // parent gender (only one such case exists today: Katress x Wixen) - in
+    // that case the value is an object listing every gendered outcome instead
+    // of a plain child name.
+    function buildSpecialCombos(breedingData, tribeToName) {
+      const combos = {};
+      for (const pair of breedingData.uniquePairs || []) {
+        const nameA = tribeToName[pair.parentAId];
+        const nameB = tribeToName[pair.parentBId];
+        const childName = tribeToName[pair.childId];
+        if (!nameA || !nameB || !childName) continue; // unresolvable / removed content
+        if (nameA === nameB && childName === nameA) continue; // trivial self-pair
+
+        const key = `${nameA} + ${nameB}`;
+        const existing = combos[key];
+
+        if (existing === undefined) {
+          combos[key] = pair.parentAGender
+            ? { default: childName, genderVariants: [{ parentAGender: pair.parentAGender, parentBGender: pair.parentBGender, child: childName }] }
+            : childName;
+        } else if (typeof existing === 'object' && pair.parentAGender) {
+          existing.genderVariants.push({ parentAGender: pair.parentAGender, parentBGender: pair.parentBGender, child: childName });
+        }
+      }
+      return combos;
+    }
+
+    // Resolves a SPECIAL_COMBOS entry (either a plain child name, or a
+    // gender-dependent object) down to the child name used for pathfinding.
+    function resolveComboChild(entry) {
+      return typeof entry === 'string' ? entry : entry.default;
+    }
+
+    // Thumbnails: the Atlas dataset has no icon/image data (it's server-side
+    // stats/breeding only), so we pull thumbnails from palworld.fandom.com's
+    // public MediaWiki API. We tried switching this to palworld.wiki.gg
+    // (the more actively-maintained wiki) but its API doesn't send the CORS
+    // headers a browser-side fetch() needs (MediaWiki's cross-origin API
+    // access has to be explicitly enabled by the wiki operator via
+    // $wgCrossSiteAJAXdomains - Fandom does this for third-party tools,
+    // wiki.gg apparently doesn't), so every request silently failed and
+    // nothing loaded. Fandom's API is confirmed working. This only affects
+    // *fetching* image URLs via script - it doesn't affect the plain "Open
+    // Pal Wiki Page" link below, which still points at wiki.gg, since a
+    // normal <a href> isn't subject to CORS at all.
+    //
+    // Coverage caveat: this depends on each Pal's display name matching (or
+    // redirecting to) a wiki page title. Base forms should match well;
+    // some variant forms (Lux/Noct/Cryst/etc.) may not resolve if the wiki
+    // doesn't give them their own page/thumbnail. Those just fall back to
+    // the plain letter avatar - nothing breaks, coverage is just imperfect
+    // until we see it running for real and can special-case any misses.
+    const IMAGE_CACHE_KEY = 'palpipeline_image_cache_v3'; // v3: reverted to fandom, wiki.gg's API doesn't support CORS
+    const WIKI_API = 'https://palworld.fandom.com/api.php';
+
+    function readImageCache() {
+      try {
+        const raw = localStorage.getItem(IMAGE_CACHE_KEY);
+        return raw ? JSON.parse(raw) : {};
+      } catch (err) {
+        console.warn('[PalPipeline] Could not read image cache:', err);
+        return {};
+      }
+    }
+
+    function writeImageCache(cache) {
+      try {
+        localStorage.setItem(IMAGE_CACHE_KEY, JSON.stringify(cache));
+      } catch (err) {
+        console.warn('[PalPipeline] Could not write image cache:', err);
+      }
+    }
+
+    async function fetchWikiThumbnailBatch(names) {
+      const titles = names.map(encodeURIComponent).join('|');
+      const url = `${WIKI_API}?action=query&format=json&origin=*&prop=pageimages&piprop=thumbnail&pithumbsize=200&redirects=1&titles=${titles}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Wiki API HTTP ${res.status}`);
+      const data = await res.json();
+
+      // Follow normalization + redirect chains (each is a from->to map) so
+      // "Fuack Ignis" resolves to whatever page actually has the thumbnail.
+      const canonical = {};
+      (data.query && data.query.normalized || []).forEach(n => { canonical[n.from] = n.to; });
+      (data.query && data.query.redirects || []).forEach(r => { canonical[r.from] = r.to; });
+
+      const thumbByTitle = {};
+      Object.values((data.query && data.query.pages) || {}).forEach(p => {
+        if (p.thumbnail && p.thumbnail.source) thumbByTitle[p.title] = p.thumbnail.source;
+      });
+
+      const result = {};
+      names.forEach(name => {
+        let t = name;
+        if (canonical[t]) t = canonical[t];
+        if (canonical[t]) t = canonical[t]; // second hop, in case of a normalize->redirect chain
+        result[name] = thumbByTitle[t] || null;
+      });
+      return result;
+    }
+
+    async function loadPalImages(palNames, forceRefresh = false) {
+      PAL_IMAGES = forceRefresh ? {} : readImageCache();
+      const missing = palNames.filter(n => !(n in PAL_IMAGES));
+      if (missing.length === 0) return;
+
+      const CHUNK = 50; // MediaWiki API's practical limit for anonymous requests
+      for (let i = 0; i < missing.length; i += CHUNK) {
+        const chunk = missing.slice(i, i + CHUNK);
+        try {
+          const batch = await fetchWikiThumbnailBatch(chunk);
+          Object.assign(PAL_IMAGES, batch);
+        } catch (err) {
+          console.warn('[PalPipeline] Wiki thumbnail batch failed, leaving those pals without images:', err);
+          chunk.forEach(n => { if (!(n in PAL_IMAGES)) PAL_IMAGES[n] = null; });
+        }
+      }
+      writeImageCache(PAL_IMAGES);
+    }
+
+    async function initializeApp(forceRefresh = false) {
+      const selects = ['startA', 'startB', 'targetPal', 'excludeSelect', 'includeSelect'];
       selects.forEach(id => {
         const sel = document.getElementById(id);
         sel.innerHTML = '<option>Loading dataset...</option>';
         sel.disabled = true;
       });
       document.getElementById('calcBtn').disabled = true;
-      
+
       const existingError = document.getElementById('errorContainer');
       if (existingError) existingError.remove();
+      document.getElementById('dataSourceLine').innerHTML = '';
 
       try {
-        const response = await fetch('https://raw.githubusercontent.com/mlg404/palworld-paldex-api/main/src/breeding.json');
-        
-        if (!response.ok) {
-          throw new Error(`HTTP Error Status: ${response.status} (${response.statusText})`);
-        }
-        
-        const rawData = await response.json();
-        
-        const palSource = Array.isArray(rawData) ? rawData : (rawData.pals || rawData.data || Object.values(rawData).find(Array.isArray) || []);
-        
-        if (!Array.isArray(palSource) || palSource.length === 0) {
-          throw new Error("Could not extract a valid Pal array from the JSON structure.");
-        }
+        const { palsData, breedingData, steamBuildId, fromCache, offline } = await loadAtlasData(forceRefresh);
+        const records = palsData.records || [];
+        if (records.length === 0) throw new Error('Atlas pals/index.json returned no records.');
 
-        PALDEX = palSource.map(p => ({
+        PALDEX = records.map(p => ({
           name: p.name,
-          power: p.breedingPower ?? p.power ?? p.value,
-          id: String(p.id ?? p.paldexId ?? "001")
-        })).sort((a, b) => a.name.localeCompare(b.name));
+          power: Number(p.breedingRank),
+          id: p.tribe || p.id,             // used to cross-reference breeding.json
+          rawId: p.id,                     // the pal-record id, may differ from tribe (e.g. mutation variants)
+          paldexNumber: p.paldexNumber,
+          rarity: p.rarity,
+          elements: p.elements || []
+        })).filter(p => p.name && !Number.isNaN(p.power))
+          .sort((a, b) => a.name.localeCompare(b.name));
 
-        SPECIAL_COMBOS = rawData.combos || rawData.specialCombos || {};
+        if (PALDEX.length === 0) {
+          throw new Error('Atlas data loaded, but no records had both a name and a usable breeding power value.');
+        }
+
+        // Safety net: a tribe (the breeding-relevant species identity) can
+        // have more than one pal record - currently true for exactly one
+        // case, Gumoss, whose "_Flower" record is a color-mutation variant
+        // rather than a distinct breedable form (both share tribe
+        // "PlantSlime"). Since breeding only cares about tribe, collapse
+        // duplicates down to one entry, preferring the record whose id has
+        // no "_suffix" (the base/wild form) over a mutation variant.
+        const byTribe = {};
+        PALDEX.forEach(p => {
+          const existing = byTribe[p.id];
+          if (!existing || (existing.rawId.includes('_') && !p.rawId.includes('_'))) {
+            byTribe[p.id] = p;
+          }
+        });
+        PALDEX = Object.values(byTribe).sort((a, b) => a.name.localeCompare(b.name));
+
+        const tribeToName = {};
+        PALDEX.forEach(p => { tribeToName[p.id] = p.name; });
+        SPECIAL_COMBOS = buildSpecialCombos(breedingData, tribeToName);
+
+        try {
+          await loadPalImages(PALDEX.map(p => p.name), forceRefresh);
+        } catch (err) {
+          console.warn('[PalPipeline] Thumbnail loading failed entirely; continuing without images:', err);
+        }
 
         populateSelects();
-        
+        setupPowerRangeSlider();
+        applyFiltersFromURL();
+
         selects.forEach(id => document.getElementById(id).disabled = false);
         document.getElementById('calcBtn').disabled = false;
 
+        let sourceLabel = fromCache ? (offline ? 'cached, offline' : 'cached') : 'freshly downloaded';
+        const imageCount = Object.values(PAL_IMAGES).filter(Boolean).length;
+        document.getElementById('dataSourceLine').innerHTML =
+          `Loaded ${PALDEX.length} Pals + ${Object.keys(SPECIAL_COMBOS).length} breeding overrides` +
+          `${steamBuildId ? ' (build ' + steamBuildId + ')' : ''} &mdash; ${sourceLabel}. ` +
+          `${imageCount}/${PALDEX.length} thumbnails loaded. ` +
+          `<a href="#" id="refreshDataLink" style="color:inherit; text-decoration:underline;">Refresh data</a>`;
+        document.getElementById('refreshDataLink').addEventListener('click', (e) => {
+          e.preventDefault();
+          initializeApp(true);
+        });
+
       } catch (err) {
-        console.error("Failed to load official dataset:", err);
+        console.error('Failed to load Atlas dataset:', err);
         displayLoadError(err.message);
       }
     }
 
     function displayLoadError(errorMessage) {
-      const selects = ['startA', 'startB', 'targetPal', 'excludeSelect'];
+      const selects = ['startA', 'startB', 'targetPal', 'excludeSelect', 'includeSelect'];
       selects.forEach(id => {
         const sel = document.getElementById(id);
         sel.innerHTML = '<option value="">-- Failed to Load --</option>';
@@ -280,7 +663,8 @@
       const errorHTML = `
         <div id="errorContainer" class="error-card">
           <h3>Failed to Load Palworld Datapack</h3>
-          <p>Could not process version-controlled JSON definitions. Details: <strong>${errorMessage}</strong></p>
+          <p>Could not load the Palworld Atlas dataset.</p>
+          <p style="white-space:pre-wrap; text-align:left; background:#0b0f19; padding:8px; border-radius:6px; font-size:0.75rem; margin-top:8px;">${errorMessage}</p>
           <button class="retry-btn" onclick="initializeApp()">Retry Loading</button>
         </div>
       `;
@@ -288,13 +672,92 @@
       document.getElementById('mainContainer').insertAdjacentHTML('beforebegin', errorHTML);
     }
 
+    // Sets up the filler-power dual slider once PALDEX is known, spanning
+    // the dataset's actual min/max breeding power rather than a hardcoded
+    // range (since that shifts as the game gets rebalanced/patched).
+    // Re-running this on a data refresh resets the range to full unless a
+    // URL param restores a specific selection (see applyFiltersFromURL).
+    //
+    // Note on direction: the internal breeding-power number is an inverse
+    // proxy for rarity/strength - rarer/stronger Pals have LOWER power
+    // numbers (e.g. Jetragon sits at power 70 vs. Lamball at 3050). So
+    // raising the floor excludes rare Pals, and lowering the ceiling
+    // excludes common ones - the opposite of what the labels might suggest
+    // at a glance, which is why the help text spells it out explicitly.
+    function setupPowerRangeSlider() {
+      const powers = PALDEX.map(p => p.power);
+      const min = Math.min(...powers);
+      const max = Math.max(...powers);
+
+      const floorInput = document.getElementById('powerFloor');
+      const ceilingInput = document.getElementById('powerCeiling');
+
+      [floorInput, ceilingInput].forEach(input => {
+        input.min = min;
+        input.max = max;
+        input.disabled = false;
+      });
+      floorInput.value = min;
+      ceilingInput.value = max;
+
+      updatePowerRangeUI();
+    }
+
+    // Keeps the two thumbs from crossing (whichever one the user is
+    // dragging pushes the other along with it, rather than refusing to
+    // move), updates the readout text, and repositions the highlighted fill
+    // bar between them. Deliberately does NOT sync the URL itself - it's
+    // also called during initial setup (setupPowerRangeSlider, before any
+    // URL restoration has happened), and syncing there would overwrite an
+    // incoming shared link's params with defaults before applyFiltersFromURL
+    // ever gets to read them. Callers that represent an actual user action
+    // (the input listeners below, applyFiltersFromURL once restoration is
+    // complete) call syncURL() themselves afterward.
+    function updatePowerRangeUI() {
+      const floorInput = document.getElementById('powerFloor');
+      const ceilingInput = document.getElementById('powerCeiling');
+      const min = Number(floorInput.min);
+      const max = Number(floorInput.max);
+      const span = max - min || 1;
+
+      let floorVal = Number(floorInput.value);
+      let ceilingVal = Number(ceilingInput.value);
+      if (floorVal > ceilingVal) {
+        if (document.activeElement === floorInput) { ceilingVal = floorVal; ceilingInput.value = ceilingVal; }
+        else { floorVal = ceilingVal; floorInput.value = floorVal; }
+      }
+
+      document.getElementById('powerRangeReadout').textContent = `${floorVal} to ${ceilingVal}`;
+
+      const fill = document.getElementById('dualSliderFill');
+      const leftPct = ((floorVal - min) / span) * 100;
+      const rightPct = ((ceilingVal - min) / span) * 100;
+      fill.style.left = `${leftPct}%`;
+      fill.style.width = `${Math.max(0, rightPct - leftPct)}%`;
+    }
+
+    document.getElementById('powerFloor').addEventListener('input', () => { updatePowerRangeUI(); syncURL(); });
+    document.getElementById('powerCeiling').addEventListener('input', () => { updatePowerRangeUI(); syncURL(); });
+
+    // The [floor, ceiling] breeding-power band currently selected, used to
+    // filter which Pals are eligible as external filler in findChains().
+    function getPowerRange() {
+      const floorInput = document.getElementById('powerFloor');
+      const ceilingInput = document.getElementById('powerCeiling');
+      let floorVal = Number(floorInput.value);
+      let ceilingVal = Number(ceilingInput.value);
+      if (floorVal > ceilingVal) [floorVal, ceilingVal] = [ceilingVal, floorVal];
+      return { floor: floorVal, ceiling: ceilingVal };
+    }
+
     function populateSelects() {
-      const selects = ['startA', 'startB', 'targetPal', 'excludeSelect'];
+      const selects = ['startA', 'startB', 'targetPal', 'excludeSelect', 'includeSelect'];
       selects.forEach(id => {
         const select = document.getElementById(id);
-        if (id !== 'excludeSelect') select.innerHTML = "";
-        else select.innerHTML = '<option value="">-- Select Pal to Exclude --</option>';
-        
+        if (id === 'excludeSelect') select.innerHTML = '<option value="">-- Select Pal to Exclude --</option>';
+        else if (id === 'includeSelect') select.innerHTML = '<option value="">-- Select Pal to Include --</option>';
+        else select.innerHTML = "";
+
         PALDEX.forEach(pal => {
           const opt = document.createElement('option');
           opt.value = pal.name;
@@ -308,16 +771,108 @@
       if (PALDEX.some(p => p.name === "Anubis")) document.getElementById('targetPal').value = "Anubis";
     }
 
+    // Mirrors every filter (both parents, target, max depth, exclusions, and
+    // the power range) into the page's URL query string via replaceState -
+    // this doesn't touch browser history, so dragging the slider or toggling
+    // exclusions repeatedly doesn't spam the back button. Copying the URL at
+    // any point reproduces the exact setup shown.
+    function syncURL() {
+      if (!PALDEX.length) return; // nothing meaningful to sync before data loads
+
+      const params = new URLSearchParams();
+      const a = document.getElementById('startA').value;
+      const b = document.getElementById('startB').value;
+      const target = document.getElementById('targetPal').value;
+      const depth = document.getElementById('maxDepth').value;
+
+      if (a) params.set('a', a);
+      if (b) params.set('b', b);
+      if (target) params.set('target', target);
+      if (depth) params.set('depth', depth);
+      if (excludedPals.size) params.set('exclude', Array.from(excludedPals).join(','));
+      if (includedPals.size) params.set('include', Array.from(includedPals).join(','));
+
+      const floorInput = document.getElementById('powerFloor');
+      const ceilingInput = document.getElementById('powerCeiling');
+      if (floorInput && !floorInput.disabled) {
+        params.set('powerMin', floorInput.value);
+        params.set('powerMax', ceilingInput.value);
+      }
+
+      history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
+    }
+
+    function readFiltersFromURL() {
+      const params = new URLSearchParams(window.location.search);
+      return {
+        a: params.get('a'),
+        b: params.get('b'),
+        target: params.get('target'),
+        depth: params.get('depth'),
+        exclude: params.get('exclude'),
+        include: params.get('include'),
+        powerMin: params.get('powerMin'),
+        powerMax: params.get('powerMax'),
+      };
+    }
+
+    // Restores filter state from the URL (if any) once PALDEX and the
+    // slider bounds are ready. Falls back to whatever populateSelects() /
+    // setupPowerRangeSlider() already set as defaults for anything the URL
+    // doesn't specify or specifies invalidly (e.g. a Pal name that no longer
+    // exists after a data refresh). If the URL fully specifies a pipeline
+    // (both parents + target), automatically runs the calculation so a
+    // shared link reproduces its result without an extra click.
+    function applyFiltersFromURL() {
+      const f = readFiltersFromURL();
+      const hasAnyParam = f.a || f.b || f.target || f.depth || f.exclude || f.include || f.powerMin || f.powerMax;
+      if (!hasAnyParam) { syncURL(); return; }
+
+      if (f.a && PALDEX.some(p => p.name === f.a)) document.getElementById('startA').value = f.a;
+      if (f.b && PALDEX.some(p => p.name === f.b)) document.getElementById('startB').value = f.b;
+      if (f.target && PALDEX.some(p => p.name === f.target)) document.getElementById('targetPal').value = f.target;
+      if (f.depth && ['2', '3', '4', '6'].includes(f.depth)) document.getElementById('maxDepth').value = f.depth;
+
+      if (f.exclude) {
+        excludedPals = new Set(f.exclude.split(',').filter(name => PALDEX.some(p => p.name === name)));
+        renderExclusionChips();
+      }
+      if (f.include) {
+        includedPals = new Set(f.include.split(',').filter(name => PALDEX.some(p => p.name === name)));
+        renderInclusionChips();
+      }
+
+      const floorInput = document.getElementById('powerFloor');
+      const ceilingInput = document.getElementById('powerCeiling');
+      if (f.powerMin !== null && !Number.isNaN(Number(f.powerMin))) {
+        floorInput.value = Math.max(Number(floorInput.min), Math.min(Number(floorInput.max), Number(f.powerMin)));
+      }
+      if (f.powerMax !== null && !Number.isNaN(Number(f.powerMax))) {
+        ceilingInput.value = Math.max(Number(ceilingInput.min), Math.min(Number(ceilingInput.max), Number(f.powerMax)));
+      }
+      updatePowerRangeUI();
+      syncURL(); // normalize the final restored state back into the URL (e.g. clamped power values)
+
+      const nameA = document.getElementById('startA').value;
+      const nameB = document.getElementById('startB').value;
+      const nameTarget = document.getElementById('targetPal').value;
+      if (f.a && f.b && f.target && nameA === f.a && nameB === f.b && nameTarget === f.target) {
+        calculateRoutes();
+      }
+    }
+
     function addExclusion(palName) {
       if (!palName || excludedPals.has(palName)) return;
       excludedPals.add(palName);
       renderExclusionChips();
+      syncURL();
       calculateRoutes();
     }
 
     function removeExclusion(palName) {
       excludedPals.delete(palName);
       renderExclusionChips();
+      syncURL();
       calculateRoutes();
     }
 
@@ -339,30 +894,69 @@
       });
     }
 
-    function getTieBreakerValue(idStr) {
-      if (!idStr) return 0;
-      let num = parseInt(idStr.replace(/\D/g, ''), 10) || 0;
-      let isVariant = idStr.includes('B');
-      return num + (isVariant ? 0.5 : 0);
+    function addInclusion(palName) {
+      if (!palName || includedPals.has(palName)) return;
+      includedPals.add(palName);
+      renderInclusionChips();
+      syncURL();
+      calculateRoutes();
     }
 
+    function removeInclusion(palName) {
+      includedPals.delete(palName);
+      renderInclusionChips();
+      syncURL();
+      calculateRoutes();
+    }
+
+    function manualInclude(palName) {
+      if (palName) {
+        addInclusion(palName);
+        document.getElementById('includeSelect').value = "";
+      }
+    }
+
+    function renderInclusionChips() {
+      const container = document.getElementById('includeChipContainer');
+      container.innerHTML = "";
+      includedPals.forEach(name => {
+        const chip = document.createElement('div');
+        chip.className = 'chip chip-include';
+        chip.innerHTML = `${name} <span class="chip-remove" onclick="removeInclusion('${name}')">&times;</span>`;
+        container.appendChild(chip);
+      });
+    }
+
+    // Tie-break rule: when two or more species are exactly equidistant from
+    // the target power, the game picks the one with the HIGHER breeding
+    // power. This isn't a rare edge case - roughly half of all possible
+    // parent pairs land on an exact tie, since breeding power values are
+    // sparse relative to the range of possible averages. We don't have
+    // access to the game's real internal tiebreak field
+    // (CombiDuplicatePriority isn't in the Atlas export), so this is based
+    // on a documented description of the mechanic plus a confirmed real
+    // case: Sibelyx + Needoll Noct averages to 1695, exactly 5 away from
+    // both Beakon (1690) and Carnibora (1700) - the game (and every
+    // ground-truth source checked) gives Carnibora, the higher of the two,
+    // not Beakon. An earlier version of this tool guessed "lower Paldex
+    // number wins" instead, which was wrong.
     function getOffspring(pA, pB) {
       if (pA.name === pB.name) return pA;
 
       const key1 = `${pA.name} + ${pB.name}`;
       const key2 = `${pB.name} + ${pA.name}`;
-      if (SPECIAL_COMBOS[key1]) return PALDEX.find(p => p.name === SPECIAL_COMBOS[key1]) || pA;
-      if (SPECIAL_COMBOS[key2]) return PALDEX.find(p => p.name === SPECIAL_COMBOS[key2]) || pA;
+      if (SPECIAL_COMBOS[key1]) return PALDEX.find(p => p.name === resolveComboChild(SPECIAL_COMBOS[key1])) || pA;
+      if (SPECIAL_COMBOS[key2]) return PALDEX.find(p => p.name === resolveComboChild(SPECIAL_COMBOS[key2])) || pA;
 
       const targetPower = Math.floor((pA.power + pB.power + 1) / 2);
-      
+
       let closestPal = PALDEX[0];
       let minDiff = Math.abs(PALDEX[0].power - targetPower);
 
       for (const pal of PALDEX) {
         const diff = Math.abs(pal.power - targetPower);
-        
-        if (diff < minDiff || (diff === minDiff && getTieBreakerValue(pal.id) < getTieBreakerValue(closestPal.id))) {
+
+        if (diff < minDiff || (diff === minDiff && pal.power > closestPal.power)) {
           minDiff = diff;
           closestPal = pal;
         }
@@ -375,16 +969,24 @@
       let queue = [{ pal: startPal, steps: [] }];
       paths[startPal.name] = [];
 
+      const { floor, ceiling } = getPowerRange();
+
       while (queue.length > 0) {
         let { pal, steps } = queue.shift();
 
         if (steps.length >= maxDepth) continue;
 
         for (let wild of PALDEX) {
+          // Exclusion and the power-range slider both apply to the filler
+          // you'd have to go catch/acquire externally for this cross - not
+          // to the bred result. A pal that's merely a stepping-stone you
+          // already have in hand (the offspring of a previous cross) is
+          // fine to pass through regardless of these filters; you're not
+          // going out of your way to obtain it.
           if (excludedPals.has(wild.name)) continue;
+          if (wild.power < floor || wild.power > ceiling) continue;
 
           let child = getOffspring(pal, wild);
-          if (excludedPals.has(child.name)) continue;
 
           let newSteps = [...steps, { parent: pal, filler: wild, result: child }];
 
@@ -400,7 +1002,9 @@
     function renderPalLink(palObj, extraClass = "") {
       const pal = typeof palObj === "string" ? PALDEX.find(p => p.name === palObj) : palObj;
       if (!pal) return palObj;
-      return `<button class="pal-link ${extraClass}" onclick="openPalModal('${pal.name}')">${pal.name} (${pal.power})</button>`;
+      const src = PAL_IMAGES[pal.name];
+      const thumb = src ? `<img class="pal-thumb" src="${src}" alt="" onerror="this.remove()">` : '';
+      return `<button class="pal-link ${extraClass}" onclick="openPalModal('${pal.name}')">${thumb}${pal.name} (${pal.power})</button>`;
     }
 
     function openPalModal(palName) {
@@ -410,10 +1014,22 @@
       currentActivePalName = palName;
 
       document.getElementById('modalTitle').textContent = pal.name;
-      document.getElementById('modalInfo').textContent = `Paldex #${pal.id} • Breeding Power: ${pal.power}`;
-      document.getElementById('modalAvatar').textContent = pal.name.charAt(0);
+      document.getElementById('modalInfo').textContent = `Paldex #${pal.paldexNumber} • Breeding Power: ${pal.power}`;
+
+      const avatar = document.getElementById('modalAvatar');
+      avatar.innerHTML = '';
+      const src = PAL_IMAGES[pal.name];
+      if (src) {
+        const img = document.createElement('img');
+        img.src = src;
+        img.alt = pal.name;
+        img.onerror = () => { avatar.innerHTML = ''; avatar.textContent = pal.name.charAt(0); };
+        avatar.appendChild(img);
+      } else {
+        avatar.textContent = pal.name.charAt(0);
+      }
       
-      const wikiUrl = `https://palworld.fandom.com/wiki/${pal.name.replace(/ /g, '_')}`;
+      const wikiUrl = `https://palworld.wiki.gg/wiki/${pal.name.replace(/ /g, '_')}`;
       document.getElementById('wikiLink').href = wikiUrl;
 
       document.getElementById('palModal').style.display = 'flex';
@@ -431,6 +1047,7 @@
     }
 
     function calculateRoutes() {
+      syncURL();
       const nameA = document.getElementById('startA').value;
       const nameB = document.getElementById('startB').value;
       const nameTarget = document.getElementById('targetPal').value;
@@ -457,18 +1074,37 @@
             let finalChild = getOffspring(interA_Pal, interB_Pal);
 
             if (finalChild.name === target.name) {
+              const lineA_Steps = chainsA[interA_Name];
+              const lineB_Steps = chainsB[interB_Name];
+
+              // Only the external filler at each step counts here - the same
+              // scope as exclusion and the power-range slider. A parent,
+              // bred intermediate result, or final-cross Pal is something
+              // you already have in hand from a previous step, not
+              // something you went out and caught, so the include list
+              // shouldn't be satisfied just because one of those happens to
+              // match.
+              const wildsUsed = new Set([...lineA_Steps, ...lineB_Steps].map(s => s.filler.name));
+
+              const matchedIncludes = Array.from(includedPals).filter(name => wildsUsed.has(name));
+
               validPipelines.push({
-                lineA_Steps: chainsA[interA_Name],
-                lineB_Steps: chainsB[interB_Name],
+                lineA_Steps, lineB_Steps,
                 finalA: interA_Pal,
                 finalB: interB_Pal,
-                totalSteps: chainsA[interA_Name].length + chainsB[interB_Name].length + 1
+                totalSteps: lineA_Steps.length + lineB_Steps.length + 1,
+                matchedIncludes
               });
             }
           }
         }
 
-        validPipelines.sort((a, b) => a.totalSteps - b.totalSteps);
+        // Prioritize pipelines that use more of the included Pals; among
+        // pipelines with an equal number of matches (including zero, when
+        // no include list is set), shorter pipelines still win.
+        validPipelines.sort((a, b) =>
+          (b.matchedIncludes.length - a.matchedIncludes.length) || (a.totalSteps - b.totalSteps)
+        );
 
         if (validPipelines.length === 0) {
           resultsDiv.innerHTML = `<div class="card"><p style="color:var(--text-dim); font-size:0.9rem;">No pipelines found within ${maxDepth} steps using current filter/exclusion settings.</p></div>`;
@@ -489,7 +1125,12 @@
             ? `<div class="step-text">Use ${renderPalLink(palB)} directly (0 steps)</div>`
             : p.lineB_Steps.map(s => `<div class="step-text">${renderPalLink(s.parent)} × ${renderPalLink(s.filler, 'highlight')} (Clean) ➔ ${renderPalLink(s.result)}</div>`).join('');
 
+          const matchBadge = p.matchedIncludes.length > 0
+            ? `<div class="match-badge">✓ Uses ${p.matchedIncludes.length} included Pal${p.matchedIncludes.length > 1 ? 's' : ''}: ${p.matchedIncludes.join(', ')}</div>`
+            : '';
+
           card.innerHTML = `
+            ${matchBadge}
             <div class="route-card">
               <div class="line-title">Line A Steps (Isolate Traits 1 & 2)</div>
               ${lineAHTML}
@@ -508,7 +1149,7 @@
       }, 50);
     }
 
-    window.onload = initializeApp;
+    window.onload = () => initializeApp();
   </script>
 </body>
 </html>
