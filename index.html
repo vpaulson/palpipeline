@@ -1009,7 +1009,7 @@
       const pal = typeof palObj === "string" ? PALDEX.find(p => p.name === palObj) : palObj;
       if (!pal) return palObj;
       const src = PAL_IMAGES[pal.name];
-      const thumb = src ? `<img class="pal-thumb" src="${src}" alt="" onerror="this.remove()">` : '';
+      const thumb = src ? `<img class="pal-thumb" src="${src}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : '';
       return `<button class="pal-link ${extraClass}" onclick="openPalModal('${pal.name}')">${thumb}${pal.name} (${pal.power})</button>`;
     }
 
@@ -1027,6 +1027,7 @@
       const src = PAL_IMAGES[pal.name];
       if (src) {
         const img = document.createElement('img');
+        img.referrerPolicy = 'no-referrer';
         img.src = src;
         img.alt = pal.name;
         img.onerror = () => { avatar.innerHTML = ''; avatar.textContent = pal.name.charAt(0); };
