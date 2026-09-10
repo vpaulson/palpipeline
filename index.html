@@ -561,8 +561,14 @@
           const batch = await fetchWikiThumbnailBatch(chunk);
           Object.assign(PAL_IMAGES, batch);
         } catch (err) {
-          console.warn('[PalPipeline] Wiki thumbnail batch failed, leaving those pals without images:', err);
-          chunk.forEach(n => { if (!(n in PAL_IMAGES)) PAL_IMAGES[n] = null; });
+          // The request itself failed here (network error, CORS rejection,
+          // Fandom rate-limiting/downtime) - this is NOT the wiki telling us
+          // "this Pal has no thumbnail". Leave these names out of PAL_IMAGES
+          // entirely instead of caching them as null, so a one-time hiccup
+          // (e.g. the very first load from a fresh origin/localStorage)
+          // doesn't get baked in as "no image, forever" and retries on the
+          // next load instead.
+          console.warn('[PalPipeline] Wiki thumbnail batch failed, will retry next load:', err);
         }
       }
       writeImageCache(PAL_IMAGES);
