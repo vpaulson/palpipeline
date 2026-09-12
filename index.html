@@ -190,6 +190,8 @@
       text-align: center;
     }
     .odds-step-pct { font-weight: 700; color: var(--accent); }
+    .odds-side-label { font-weight: 700; color: var(--text); }
+    .odds-mirror { font-weight: 700; color: var(--text-dim); font-style: italic; }
     .odds-disclaimer {
       font-size: 0.68rem;
       color: var(--text-dim);
@@ -335,11 +337,29 @@
 
   <div id="mainContainer">
     <div class="card">
-      <label for="startA">Line A Parent (Traits 1 & 2)</label>
+      <label for="startA">Line A Parent</label>
       <select id="startA" disabled onchange="syncURL()"><option>Loading dataset...</option></select>
+      <div class="odds-row" style="margin: -8px 0 14px;">
+        <div class="odds-group">
+          <span class="odds-side-label">Its traits:</span>
+          <input type="number" class="odds-input" id="globalParentA-desired" min="0" max="4" value="2" oninput="recalcAllPipelineOdds()">
+          desired of
+          <input type="number" class="odds-input" id="globalParentA-total" min="0" max="4" value="2" oninput="recalcAllPipelineOdds()">
+          total traits
+        </div>
+      </div>
 
-      <label for="startB">Line B Parent (Traits 3 & 4)</label>
+      <label for="startB">Line B Parent</label>
       <select id="startB" disabled onchange="syncURL()"><option>Loading dataset...</option></select>
+      <div class="odds-row" style="margin: -8px 0 14px;">
+        <div class="odds-group">
+          <span class="odds-side-label">Its traits:</span>
+          <input type="number" class="odds-input" id="globalParentB-desired" min="0" max="4" value="2" oninput="recalcAllPipelineOdds()">
+          desired of
+          <input type="number" class="odds-input" id="globalParentB-total" min="0" max="4" value="2" oninput="recalcAllPipelineOdds()">
+          total traits
+        </div>
+      </div>
 
       <label for="targetPal">Target Pal (Final Goal)</label>
       <select id="targetPal" disabled onchange="syncURL()"><option>Loading dataset...</option></select>
@@ -1016,7 +1036,18 @@
     function stepInheritanceProbability(parentTotal, parentDesired, wildTotal, wildDesired) {
       const poolSize = parentTotal + wildTotal;
       const desiredCount = parentDesired + wildDesired;
-      if (desiredCount === 0) return 1; // nothing required - vacuously guaranteed
+      if (desiredCount === 0) {
+        // Wanting zero traits means a clean result requires the child to
+        // come out completely empty. With an empty pool there's nothing to
+        // inherit, so that's vacuously guaranteed. But INHERIT_COUNT_WEIGHTS
+        // only has buckets for inheriting 1-4 slots - the pool roll can
+        // never land on 0 - so once the pool has ANY trait in it, at least
+        // one is always going to end up on the child. A literal 0-trait
+        // result from a nonempty pool isn't just unlikely, it's impossible
+        // under this model (matching PalCalc and the wider community
+        // consensus: nobody's documented a path to it).
+        return poolSize === 0 ? 1 : 0;
+      }
       if (poolSize === 0) return 0; // desired traits can't exist in an empty pool (shouldn't happen given desiredCount<=poolSize by construction)
 
       const maxK = Math.min(4, poolSize);
@@ -1061,27 +1092,61 @@
       return (n < 10 ? n.toFixed(1) : Math.round(n).toString()) + (n <= 1.05 ? ' egg' : ' eggs');
     }
 
-    // Renders the compact "Parent traits: N of M desired / Wild traits: N of
-    // M desired" control row for one cross, plus its own live percent
-    // readout. `idPrefix` must be unique per step across the whole results
-    // view (see the pN-a/b/final scheme in calculateRoutes) since every
-    // control and readout is looked up by id.
+    // Renders one "N desired of M total traits" side of a step's odds row.
+    // Normally that's a pair of inputs scoped to this exact step
+    // (${idPrefix}-${sideKey}Desired/Total). But the "parent" side of a
+    // line's FIRST step - and of the final cross, when a line has 0 steps -
+    // is always literally the Pal you picked in Line A/B Parent at the top
+    // of the page, which doesn't change between candidate pipelines. For
+    // those, pass a globalPrefix instead: this renders a read-only mirror
+    // of the shared top-of-page control rather than its own editable copy,
+    // so there's exactly one place to configure it. updateStepOdds() (see
+    // readAndMirrorTraitSide below) keeps that mirror's text in sync.
+    function renderTraitSide(idPrefix, sideKey, label, opts) {
+      if (opts.globalPrefix) {
+        return `
+          <div class="odds-group">
+            <span class="odds-side-label">${label}:</span>
+            <span class="odds-mirror" id="${idPrefix}-${sideKey}Mirror">--</span>
+          </div>`;
+      }
+      // Desired count is read first ("2 desired") since that's the number
+      // you're actually setting out to track; total comes right after as
+      // the denominator ("...of 4 total traits"), so the pair reads as one
+      // fraction-style phrase instead of two separately-labeled numbers.
+      return `
+        <div class="odds-group">
+          <span class="odds-side-label">${label}:</span>
+          <input type="number" class="odds-input" id="${idPrefix}-${sideKey}Desired" min="0" max="4" value="${opts.desired}" oninput="${opts.onChangeAttr}">
+          desired of
+          <input type="number" class="odds-input" id="${idPrefix}-${sideKey}Total" min="0" max="4" value="${opts.total}" oninput="${opts.onChangeAttr}">
+          total traits
+        </div>`;
+    }
+
+    // Renders the compact odds control row for one cross (a parent side, a
+    // wild side, and a live percent readout). `idPrefix` must be unique per
+    // step across the whole results view (see the pN-a/b/final scheme in
+    // calculateRoutes) since every control and readout is looked up by id.
+    // Pass parentGlobalPrefix/wildGlobalPrefix (see renderTraitSide above)
+    // when a side should mirror the shared top-of-page Parent A/B control
+    // instead of getting its own editable inputs.
     function renderOddsWidget(idPrefix, onChangeAttr, defaults) {
-      const d = Object.assign({ parentTotal: 2, parentDesired: 2, wildTotal: 0, wildDesired: 0, parentLabel: 'Parent', wildLabel: 'Wild' }, defaults);
+      const d = Object.assign({
+        parentTotal: 2, parentDesired: 2, wildTotal: 0, wildDesired: 0,
+        parentLabel: 'Parent', wildLabel: 'Wild',
+        parentGlobalPrefix: null, wildGlobalPrefix: null
+      }, defaults);
+      const parentOpts = d.parentGlobalPrefix
+        ? { globalPrefix: d.parentGlobalPrefix }
+        : { total: d.parentTotal, desired: d.parentDesired, onChangeAttr };
+      const wildOpts = d.wildGlobalPrefix
+        ? { globalPrefix: d.wildGlobalPrefix }
+        : { total: d.wildTotal, desired: d.wildDesired, onChangeAttr };
       return `
         <div class="odds-row">
-          <div class="odds-group">
-            ${d.parentLabel} traits:
-            <input type="number" class="odds-input" id="${idPrefix}-parentTotal" min="0" max="4" value="${d.parentTotal}" oninput="${onChangeAttr}">
-            of which desired:
-            <input type="number" class="odds-input" id="${idPrefix}-parentDesired" min="0" max="4" value="${d.parentDesired}" oninput="${onChangeAttr}">
-          </div>
-          <div class="odds-group">
-            ${d.wildLabel} traits:
-            <input type="number" class="odds-input" id="${idPrefix}-wildTotal" min="0" max="4" value="${d.wildTotal}" oninput="${onChangeAttr}">
-            of which desired:
-            <input type="number" class="odds-input" id="${idPrefix}-wildDesired" min="0" max="4" value="${d.wildDesired}" oninput="${onChangeAttr}">
-          </div>
+          ${renderTraitSide(idPrefix, 'parent', d.parentLabel, parentOpts)}
+          ${renderTraitSide(idPrefix, 'wild', d.wildLabel, wildOpts)}
           <div>Step odds: <span class="odds-step-pct" id="${idPrefix}-pct">--</span></div>
         </div>`;
     }
@@ -1098,15 +1163,35 @@
       return v;
     }
 
-    // Reads one step's four inputs, computes and displays its percent AND
-    // its expected-eggs-until-success, and returns the raw probability for
-    // the caller to fold into the pipeline-wide totals.
-    function updateStepOdds(idPrefix) {
-      const parentTotal = clampOddsInput(`${idPrefix}-parentTotal`, 0, 4);
-      const parentDesired = clampOddsInput(`${idPrefix}-parentDesired`, 0, parentTotal);
-      const wildTotal = clampOddsInput(`${idPrefix}-wildTotal`, 0, 4);
-      const wildDesired = clampOddsInput(`${idPrefix}-wildDesired`, 0, wildTotal);
-      const p = stepInheritanceProbability(parentTotal, parentDesired, wildTotal, wildDesired);
+    // Reads one side's total/desired counts. Normally that's this step's
+    // own ${idPrefix}-${sideKey}Total/Desired inputs. When globalPrefix is
+    // given (this side mirrors the shared top-of-page Parent A/B control -
+    // see renderTraitSide above), it instead reads ${globalPrefix}-total/
+    // desired and writes the current value into this step's read-only
+    // mirror span so the two stay in sync.
+    function readAndMirrorTraitSide(idPrefix, sideKey, globalPrefix) {
+      if (globalPrefix) {
+        const total = clampOddsInput(`${globalPrefix}-total`, 0, 4);
+        const desired = clampOddsInput(`${globalPrefix}-desired`, 0, total);
+        const mirrorEl = document.getElementById(`${idPrefix}-${sideKey}Mirror`);
+        if (mirrorEl) mirrorEl.textContent = `${desired} desired of ${total} total traits`;
+        return { total, desired };
+      }
+      const total = clampOddsInput(`${idPrefix}-${sideKey}Total`, 0, 4);
+      const desired = clampOddsInput(`${idPrefix}-${sideKey}Desired`, 0, total);
+      return { total, desired };
+    }
+
+    // Reads one step's parent/wild counts, computes and displays its
+    // percent AND its expected-eggs-until-success, and returns the raw
+    // probability for the caller to fold into the pipeline-wide totals.
+    // parentGlobalPrefix/wildGlobalPrefix mirror the shared top-of-page
+    // Parent A/B control instead of this step's own inputs - see
+    // readAndMirrorTraitSide.
+    function updateStepOdds(idPrefix, parentGlobalPrefix, wildGlobalPrefix) {
+      const parent = readAndMirrorTraitSide(idPrefix, 'parent', parentGlobalPrefix);
+      const wild = readAndMirrorTraitSide(idPrefix, 'wild', wildGlobalPrefix);
+      const p = stepInheritanceProbability(parent.total, parent.desired, wild.total, wild.desired);
       const pctEl = document.getElementById(`${idPrefix}-pct`);
       if (pctEl) pctEl.textContent = `${formatPct(p)} (~${formatEggs(expectedAttempts(p))} at this step)`;
       return p;
@@ -1133,16 +1218,30 @@
       let firstTryChance = 1;
       let totalEggs = 0;
       for (let i = 0; i < lineACount; i++) {
-        const p = updateStepOdds(`p${pipelineIdx}-a${i}`);
+        // Step 0's parent side is literally the Line A Parent pal picked
+        // at the top of the page - same Pal across every candidate
+        // pipeline - so it mirrors the shared global control instead of
+        // getting its own input. Every later step's parent is an
+        // intermediate bred result, which can genuinely differ, so it
+        // stays locally editable.
+        const p = updateStepOdds(`p${pipelineIdx}-a${i}`, i === 0 ? 'globalParentA' : null);
         firstTryChance *= p;
         totalEggs += expectedAttempts(p);
       }
       for (let i = 0; i < lineBCount; i++) {
-        const p = updateStepOdds(`p${pipelineIdx}-b${i}`);
+        const p = updateStepOdds(`p${pipelineIdx}-b${i}`, i === 0 ? 'globalParentB' : null);
         firstTryChance *= p;
         totalEggs += expectedAttempts(p);
       }
-      const pFinal = updateStepOdds(`p${pipelineIdx}-final`);
+      // The final cross's two sides are whatever each line converged to -
+      // an intermediate result if that line took steps, or literally the
+      // raw starting parent if it took none, in which case that side
+      // mirrors the global control too.
+      const pFinal = updateStepOdds(
+        `p${pipelineIdx}-final`,
+        lineACount === 0 ? 'globalParentA' : null,
+        lineBCount === 0 ? 'globalParentB' : null
+      );
       firstTryChance *= pFinal;
       totalEggs += expectedAttempts(pFinal);
 
@@ -1152,6 +1251,18 @@
       if (firstTryEl) firstTryEl.textContent = formatPct(firstTryChance);
 
       return { totalEggs, firstTryChance };
+    }
+
+    // Tracks each currently-rendered pipeline card's line lengths (set in
+    // calculateRoutes) so the shared Parent A/B controls at the top of the
+    // page can refresh every visible card's mirrored step(s) when edited,
+    // without the caller needing to know how many cards are showing.
+    let RENDERED_PIPELINE_COUNTS = [];
+
+    function recalcAllPipelineOdds() {
+      RENDERED_PIPELINE_COUNTS.forEach((counts, idx) => {
+        if (counts) recalcPipelineOdds(idx, counts.lineACount, counts.lineBCount);
+      });
     }
 
     function getOffspring(pA, pB) {
@@ -1327,30 +1438,35 @@
 
         resultsDiv.innerHTML = `<h2 style="font-size:1rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-dim); margin-bottom:12px;">Found ${validPipelines.length} Available Multi-Step Pipelines</h2>`;
 
+        RENDERED_PIPELINE_COUNTS = [];
+
         validPipelines.slice(0, 5).forEach((p, idx) => {
           const card = document.createElement('div');
           card.className = 'card';
 
           const lineACount = p.lineA_Steps.length;
           const lineBCount = p.lineB_Steps.length;
+          RENDERED_PIPELINE_COUNTS[idx] = { lineACount, lineBCount };
           const onChange = `recalcPipelineOdds(${idx}, ${lineACount}, ${lineBCount})`;
 
           let lineAHTML = lineACount === 0
             ? `<div class="step-text">Use ${renderPalLink(palA)} directly (0 steps)</div>`
             : p.lineA_Steps.map((s, i) => `
-                <div class="step-text">${renderPalLink(s.parent)} × ${renderPalLink(s.filler, 'highlight')} (Clean) ➔ ${renderPalLink(s.result)}</div>
-                ${renderOddsWidget(`p${idx}-a${i}`, onChange, { wildLabel: 'Wild' })}
+                <div class="step-text">${renderPalLink(s.parent)} × ${renderPalLink(s.filler, 'highlight')} ➔ ${renderPalLink(s.result)}</div>
+                ${renderOddsWidget(`p${idx}-a${i}`, onChange, { wildLabel: 'Wild', parentGlobalPrefix: i === 0 ? 'globalParentA' : null })}
               `).join('');
 
           let lineBHTML = lineBCount === 0
             ? `<div class="step-text">Use ${renderPalLink(palB)} directly (0 steps)</div>`
             : p.lineB_Steps.map((s, i) => `
-                <div class="step-text">${renderPalLink(s.parent)} × ${renderPalLink(s.filler, 'highlight')} (Clean) ➔ ${renderPalLink(s.result)}</div>
-                ${renderOddsWidget(`p${idx}-b${i}`, onChange, { wildLabel: 'Wild' })}
+                <div class="step-text">${renderPalLink(s.parent)} × ${renderPalLink(s.filler, 'highlight')} ➔ ${renderPalLink(s.result)}</div>
+                ${renderOddsWidget(`p${idx}-b${i}`, onChange, { wildLabel: 'Wild', parentGlobalPrefix: i === 0 ? 'globalParentB' : null })}
               `).join('');
 
           const finalOddsHTML = renderOddsWidget(`p${idx}-final`, onChange, {
-            parentLabel: 'Parent A', wildLabel: 'Parent B', wildTotal: 2, wildDesired: 2
+            parentLabel: 'Parent A', wildLabel: 'Parent B', wildTotal: 2, wildDesired: 2,
+            parentGlobalPrefix: lineACount === 0 ? 'globalParentA' : null,
+            wildGlobalPrefix: lineBCount === 0 ? 'globalParentB' : null
           });
 
           const matchBadge = p.matchedIncludes.length > 0
@@ -1365,11 +1481,11 @@
               <div class="secondary-stat">Chance every step succeeds on the first try, no retries: <span id="p${idx}-overall-firsttry">--</span></div>
             </div>
             <div class="route-card">
-              <div class="line-title">Line A Steps (Isolate Traits 1 & 2)</div>
+              <div class="line-title">Line A Steps</div>
               ${lineAHTML}
             </div>
             <div class="route-card">
-              <div class="line-title">Line B Steps (Isolate Traits 3 & 4)</div>
+              <div class="line-title">Line B Steps</div>
               ${lineBHTML}
             </div>
             <div class="route-card" style="border-left-color: var(--accent-green);">

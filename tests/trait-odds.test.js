@@ -26,10 +26,10 @@ test('trait inheritance probability model', async (t) => {
     assert.ok(Math.abs(p - (3 / 7) * 0.4) < 1e-9);
   });
 
-  await t.test('zero desired traits is vacuously guaranteed (100%), with or without junk present', async () => {
+  await t.test('zero desired traits is only vacuously guaranteed (100%) if the pool is ALSO empty - a nonempty pool always inherits 1+ traits, so a literal 0-trait result is impossible (0%), not just unlikely', async () => {
     const app = loadApp();
     assert.equal(app.stepInheritanceProbability(0, 0, 0, 0), 1);
-    assert.equal(app.stepInheritanceProbability(2, 0, 3, 0), 1);
+    assert.equal(app.stepInheritanceProbability(2, 0, 3, 0), 0);
   });
 
   await t.test('adding junk traits strictly decreases the odds', async () => {
@@ -127,11 +127,21 @@ test('trait odds UI generation and recalculation', async (t) => {
       app.document.getElementById(`${prefix}-wildTotal`).value = wildTotal;
       app.document.getElementById(`${prefix}-wildDesired`).value = wildDesired;
     };
+    const seedGlobal = (globalPrefix, total, desired) => {
+      app.document.getElementById(`${globalPrefix}-total`).value = total;
+      app.document.getElementById(`${globalPrefix}-desired`).value = desired;
+    };
 
-    seed('p0-a0', 2, 2, 0, 0);
-    seed('p0-b0', 2, 2, 0, 0);
-    seed('p0-b1', 2, 2, 0, 0);
-    seed('p0-final', 2, 2, 2, 2);
+    // a0 and b0 are each their line's first step, so their PARENT side now
+    // mirrors the shared globalParentA/B controls instead of a local
+    // per-step input (see the "Only the first step per line" design) -
+    // seed those globals rather than p0-a0/p0-b0's own parent fields.
+    seedGlobal('globalParentA', 2, 2);
+    seedGlobal('globalParentB', 2, 2);
+    seed('p0-a0', 2, 2, 0, 0); // parent portion here is now ignored; wild (0,0) still applies
+    seed('p0-b0', 2, 2, 0, 0); // same
+    seed('p0-b1', 2, 2, 0, 0); // b1 isn't a first step - fully local as before
+    seed('p0-final', 2, 2, 2, 2); // both lines have steps, so final stays fully local too
 
     const { totalEggs, firstTryChance } = app.recalcPipelineOdds(0, 1, 2); // 1 Line A step, 2 Line B steps
 
@@ -161,9 +171,18 @@ test('trait odds UI generation and recalculation', async (t) => {
       app.document.getElementById(`${prefix}-wildTotal`).value = wildTotal;
       app.document.getElementById(`${prefix}-wildDesired`).value = wildDesired;
     };
+    const seedGlobal = (globalPrefix, total, desired) => {
+      app.document.getElementById(`${globalPrefix}-total`).value = total;
+      app.document.getElementById(`${globalPrefix}-desired`).value = desired;
+    };
 
+    // a0 is Line A's first step (parent -> globalParentA). With 0 Line B
+    // steps, the final cross's "Parent B" side IS the raw starting Line B
+    // parent (finalB === palB directly), so it mirrors globalParentB too.
+    seedGlobal('globalParentA', 2, 2);
+    seedGlobal('globalParentB', 2, 2);
     seed('p0-a0', 2, 2, 0, 0);
-    seed('p0-final', 2, 2, 2, 2);
+    seed('p0-final', 2, 2, 2, 2); // parent portion (2,2) stays local since lineACount>0
     const clean = app.recalcPipelineOdds(0, 1, 0);
 
     seed('p0-a0', 2, 2, 1, 0); // introduce 1 junk trait on the wild side of this step
@@ -175,14 +194,16 @@ test('trait odds UI generation and recalculation', async (t) => {
 
   await t.test('a genuinely impossible step (>4 total desired) surfaces as "impossible", not a broken number', () => {
     const app = loadApp();
-    const seed = (prefix, parentTotal, parentDesired, wildTotal, wildDesired) => {
-      app.document.getElementById(`${prefix}-parentTotal`).value = parentTotal;
-      app.document.getElementById(`${prefix}-parentDesired`).value = parentDesired;
-      app.document.getElementById(`${prefix}-wildTotal`).value = wildTotal;
-      app.document.getElementById(`${prefix}-wildDesired`).value = wildDesired;
+    const seedGlobal = (globalPrefix, total, desired) => {
+      app.document.getElementById(`${globalPrefix}-total`).value = total;
+      app.document.getElementById(`${globalPrefix}-desired`).value = desired;
     };
 
-    seed('p0-final', 4, 4, 4, 4); // 8 desired traits, only 4 child slots exist
+    // 0 steps on both lines: the final cross's parent AND wild side are
+    // each the raw starting parent directly, so both mirror the global
+    // controls - 8 desired traits total, only 4 child slots exist.
+    seedGlobal('globalParentA', 4, 4);
+    seedGlobal('globalParentB', 4, 4);
     const { totalEggs } = app.recalcPipelineOdds(0, 0, 0);
 
     assert.equal(totalEggs, Infinity);
@@ -197,9 +218,18 @@ test('trait odds UI generation and recalculation', async (t) => {
       app.document.getElementById(`${prefix}-wildTotal`).value = wildTotal;
       app.document.getElementById(`${prefix}-wildDesired`).value = wildDesired;
     };
+    const seedGlobal = (globalPrefix, total, desired) => {
+      app.document.getElementById(`${globalPrefix}-total`).value = total;
+      app.document.getElementById(`${globalPrefix}-desired`).value = desired;
+    };
 
-    seed('p0-b0', 2, 2, 0, 0);
-    seed('p0-final', 2, 2, 2, 2);
+    // lineACount = 0, so the final cross's "parent" (Parent A) side is the
+    // raw starting Line A parent directly -> mirrors globalParentA. b0 is
+    // Line B's first step, so ITS parent side mirrors globalParentB.
+    seedGlobal('globalParentA', 2, 2);
+    seedGlobal('globalParentB', 2, 2);
+    seed('p0-b0', 2, 2, 0, 0); // parent portion now ignored; wild (0,0) still applies
+    seed('p0-final', 2, 2, 2, 2); // wild portion (Parent B, 2,2) stays local since lineBCount>0
     const { totalEggs } = app.recalcPipelineOdds(0, 0, 1); // lineACount = 0
 
     const expected = 1 / ((3 / 7) * 0.4) + 10;
@@ -213,5 +243,62 @@ test('trait odds UI generation and recalculation', async (t) => {
     const clamped = app.clampOddsInput('p0-a0-parentDesired', 0, 1);
     assert.equal(clamped, 1);
     assert.equal(app.document.getElementById('p0-a0-parentDesired').value, 1);
+  });
+});
+
+test('shared Parent A/B controls (global mirroring)', async (t) => {
+  await t.test('renderOddsWidget renders a read-only mirror, not editable inputs, for a globalPrefix side', async () => {
+    const app = loadApp();
+    const html = app.renderOddsWidget('p0-a0', 'onchange()', { wildLabel: 'Wild', parentGlobalPrefix: 'globalParentA' });
+
+    assert.doesNotMatch(html, /id="p0-a0-parentTotal"/);
+    assert.doesNotMatch(html, /id="p0-a0-parentDesired"/);
+    assert.match(html, /id="p0-a0-parentMirror"/);
+    // The wild side is untouched - still its own editable inputs.
+    assert.match(html, /id="p0-a0-wildTotal"/);
+    assert.match(html, /id="p0-a0-wildDesired"/);
+  });
+
+  await t.test('updateStepOdds reads a globalPrefix side from the shared control and mirrors its value into the step', async () => {
+    const app = loadApp();
+    app.document.getElementById('globalParentA-total').value = 3;
+    app.document.getElementById('globalParentA-desired').value = 2;
+    app.document.getElementById('p0-a0-wildTotal').value = 0;
+    app.document.getElementById('p0-a0-wildDesired').value = 0;
+
+    const p = app.updateStepOdds('p0-a0', 'globalParentA');
+
+    assert.ok(Math.abs(p - app.stepInheritanceProbability(3, 2, 0, 0)) < 1e-9);
+    assert.equal(app.document.getElementById('p0-a0-parentMirror').textContent, '2 desired of 3 total traits');
+  });
+
+  await t.test('recalcAllPipelineOdds refreshes every rendered card when a shared Parent A/B control changes', async () => {
+    const app = loadApp();
+    // Two cards, each with a single Line A step (parent -> globalParentA)
+    // and no Line B steps or final-cross inputs seeded - only the a0 step
+    // matters for this check.
+    app.RENDERED_PIPELINE_COUNTS = [{ lineACount: 1, lineBCount: 0 }, { lineACount: 1, lineBCount: 0 }];
+    ['p0-a0', 'p1-a0'].forEach((prefix) => {
+      app.document.getElementById(`${prefix}-wildTotal`).value = 0;
+      app.document.getElementById(`${prefix}-wildDesired`).value = 0;
+    });
+    // Both final-cross widgets read straight from the globals too here
+    // (lineBCount = 0 on both cards), so seed globalParentB as well.
+    app.document.getElementById('globalParentB-total').value = 2;
+    app.document.getElementById('globalParentB-desired').value = 2;
+
+    app.document.getElementById('globalParentA-total').value = 2;
+    app.document.getElementById('globalParentA-desired').value = 2;
+    app.recalcAllPipelineOdds();
+    const before = app.document.getElementById('p0-a0-pct').textContent;
+
+    app.document.getElementById('globalParentA-total').value = 4;
+    app.document.getElementById('globalParentA-desired').value = 2;
+    app.recalcAllPipelineOdds();
+    const after0 = app.document.getElementById('p0-a0-pct').textContent;
+    const after1 = app.document.getElementById('p1-a0-pct').textContent;
+
+    assert.notEqual(before, after0, 'changing the shared control should change card 0\'s step odds');
+    assert.equal(after0, after1, 'both cards should update to the same value from the one shared control');
   });
 });
