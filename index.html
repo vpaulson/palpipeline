@@ -190,6 +190,7 @@
       text-align: center;
     }
     .odds-step-pct { font-weight: 700; color: var(--accent); }
+    .odds-side-label { font-weight: 700; color: var(--text); }
     .odds-disclaimer {
       font-size: 0.68rem;
       color: var(--text-dim);
@@ -1079,19 +1080,25 @@
     // control and readout is looked up by id.
     function renderOddsWidget(idPrefix, onChangeAttr, defaults) {
       const d = Object.assign({ parentTotal: 2, parentDesired: 2, wildTotal: 0, wildDesired: 0, parentLabel: 'Parent', wildLabel: 'Wild' }, defaults);
+      // Desired count is read first ("2 desired") since that's the number
+      // you're actually setting out to track; total comes right after as
+      // the denominator ("...of 4 total traits"), so the pair reads as one
+      // fraction-style phrase instead of two separately-labeled numbers.
       return `
         <div class="odds-row">
           <div class="odds-group">
-            ${d.parentLabel} traits:
-            <input type="number" class="odds-input" id="${idPrefix}-parentTotal" min="0" max="4" value="${d.parentTotal}" oninput="${onChangeAttr}">
-            of which desired:
+            <span class="odds-side-label">${d.parentLabel}:</span>
             <input type="number" class="odds-input" id="${idPrefix}-parentDesired" min="0" max="4" value="${d.parentDesired}" oninput="${onChangeAttr}">
+            desired of
+            <input type="number" class="odds-input" id="${idPrefix}-parentTotal" min="0" max="4" value="${d.parentTotal}" oninput="${onChangeAttr}">
+            total traits
           </div>
           <div class="odds-group">
-            ${d.wildLabel} traits:
-            <input type="number" class="odds-input" id="${idPrefix}-wildTotal" min="0" max="4" value="${d.wildTotal}" oninput="${onChangeAttr}">
-            of which desired:
+            <span class="odds-side-label">${d.wildLabel}:</span>
             <input type="number" class="odds-input" id="${idPrefix}-wildDesired" min="0" max="4" value="${d.wildDesired}" oninput="${onChangeAttr}">
+            desired of
+            <input type="number" class="odds-input" id="${idPrefix}-wildTotal" min="0" max="4" value="${d.wildTotal}" oninput="${onChangeAttr}">
+            total traits
           </div>
           <div>Step odds: <span class="odds-step-pct" id="${idPrefix}-pct">--</span></div>
         </div>`;
@@ -1376,11 +1383,11 @@
               <div class="secondary-stat">Chance every step succeeds on the first try, no retries: <span id="p${idx}-overall-firsttry">--</span></div>
             </div>
             <div class="route-card">
-              <div class="line-title">Line A Steps (Isolate Traits 1 & 2)</div>
+              <div class="line-title">Line A Steps</div>
               ${lineAHTML}
             </div>
             <div class="route-card">
-              <div class="line-title">Line B Steps (Isolate Traits 3 & 4)</div>
+              <div class="line-title">Line B Steps</div>
               ${lineBHTML}
             </div>
             <div class="route-card" style="border-left-color: var(--accent-green);">
