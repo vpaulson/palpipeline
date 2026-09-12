@@ -138,6 +138,55 @@
       margin: 0 0 8px;
     }
 
+    .overall-odds {
+      text-align: center;
+      background: #0b0f19;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 10px;
+    }
+    .overall-odds .value {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--accent-green);
+    }
+    .overall-odds .label {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .odds-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      margin: 4px 0 10px;
+      padding-left: 4px;
+    }
+    .odds-group { display: flex; align-items: center; gap: 4px; }
+    .odds-input {
+      width: 34px;
+      padding: 2px 4px;
+      background: #0b0f19;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      font-size: 0.72rem;
+      text-align: center;
+    }
+    .odds-step-pct { font-weight: 700; color: var(--accent); }
+    .odds-disclaimer {
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      text-align: center;
+      margin-top: 10px;
+      line-height: 1.4;
+    }
+
     .route-card { background: #0b0f19; border-left: 4px solid var(--accent); padding: 12px; border-radius: 6px; margin-bottom: 10px; }
     .line-title { font-weight: 700; color: var(--accent); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
     .step-text { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 6px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
@@ -482,96 +531,33 @@
     }
 
     // Thumbnails: the Atlas dataset has no icon/image data (it's server-side
-    // stats/breeding only), so we pull thumbnails from palworld.fandom.com's
-    // public MediaWiki API. We tried switching this to palworld.wiki.gg
-    // (the more actively-maintained wiki) but its API doesn't send the CORS
-    // headers a browser-side fetch() needs (MediaWiki's cross-origin API
-    // access has to be explicitly enabled by the wiki operator via
-    // $wgCrossSiteAJAXdomains - Fandom does this for third-party tools,
-    // wiki.gg apparently doesn't), so every request silently failed and
-    // nothing loaded. Fandom's API is confirmed working. This only affects
-    // *fetching* image URLs via script - it doesn't affect the plain "Open
-    // Pal Wiki Page" link below, which still points at wiki.gg, since a
-    // normal <a href> isn't subject to CORS at all.
+    // stats/breeding only). This used to fetch thumbnails live from the
+    // Fandom wiki's API at runtime, but that turned out to be a recurring
+    // source of trouble - it depends on a third-party API being reachable
+    // and CORS-friendly (wiki.gg wasn't; Fandom worked locally but then
+    // failed when deployed to GitHub Pages, likely referrer/hotlink or
+    // network-policy differences between origins that are hard to fully
+    // control from a static page).
     //
-    // Coverage caveat: this depends on each Pal's display name matching (or
-    // redirecting to) a wiki page title. Base forms should match well;
-    // some variant forms (Lux/Noct/Cryst/etc.) may not resolve if the wiki
-    // doesn't give them their own page/thumbnail. Those just fall back to
-    // the plain letter avatar - nothing breaks, coverage is just imperfect
-    // until we see it running for real and can special-case any misses.
-    const IMAGE_CACHE_KEY = 'palpipeline_image_cache_v4'; // v4: v3 could permanently cache a failed *request* as "no thumbnail" - bump to clear any bad state already sitting in visitors' browsers
-    const WIKI_API = 'https://palworld.fandom.com/api.php';
-
-    function readImageCache() {
+    // Instead, images are downloaded ONCE, offline, by running
+    // download-images.js (in the project folder) with real network access,
+    // which saves each Pal's thumbnail into an images/ folder and writes
+    // images-manifest.json mapping display name -> local file path. This
+    // file just loads that manifest as a plain same-origin static file -
+    // no external API, no CORS question at all, works identically on
+    // localhost, file://, and GitHub Pages. If the manifest or an
+    // individual image file is missing (e.g. the download script was never
+    // run), everything still works - it just falls back to the plain
+    // letter avatar, same as an unresolved thumbnail always did.
+    async function loadImageManifest() {
       try {
-        const raw = localStorage.getItem(IMAGE_CACHE_KEY);
-        return raw ? JSON.parse(raw) : {};
+        const res = await fetch('images-manifest.json');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        PAL_IMAGES = await res.json();
       } catch (err) {
-        console.warn('[PalPipeline] Could not read image cache:', err);
-        return {};
+        console.warn('[PalPipeline] No local images-manifest.json found (run download-images.js to add thumbnails); continuing without images.', err);
+        PAL_IMAGES = {};
       }
-    }
-
-    function writeImageCache(cache) {
-      try {
-        localStorage.setItem(IMAGE_CACHE_KEY, JSON.stringify(cache));
-      } catch (err) {
-        console.warn('[PalPipeline] Could not write image cache:', err);
-      }
-    }
-
-    async function fetchWikiThumbnailBatch(names) {
-      const titles = names.map(encodeURIComponent).join('|');
-      const url = `${WIKI_API}?action=query&format=json&origin=*&prop=pageimages&piprop=thumbnail&pithumbsize=200&redirects=1&titles=${titles}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`Wiki API HTTP ${res.status}`);
-      const data = await res.json();
-
-      // Follow normalization + redirect chains (each is a from->to map) so
-      // "Fuack Ignis" resolves to whatever page actually has the thumbnail.
-      const canonical = {};
-      (data.query && data.query.normalized || []).forEach(n => { canonical[n.from] = n.to; });
-      (data.query && data.query.redirects || []).forEach(r => { canonical[r.from] = r.to; });
-
-      const thumbByTitle = {};
-      Object.values((data.query && data.query.pages) || {}).forEach(p => {
-        if (p.thumbnail && p.thumbnail.source) thumbByTitle[p.title] = p.thumbnail.source;
-      });
-
-      const result = {};
-      names.forEach(name => {
-        let t = name;
-        if (canonical[t]) t = canonical[t];
-        if (canonical[t]) t = canonical[t]; // second hop, in case of a normalize->redirect chain
-        result[name] = thumbByTitle[t] || null;
-      });
-      return result;
-    }
-
-    async function loadPalImages(palNames, forceRefresh = false) {
-      PAL_IMAGES = forceRefresh ? {} : readImageCache();
-      const missing = palNames.filter(n => !(n in PAL_IMAGES));
-      if (missing.length === 0) return;
-
-      const CHUNK = 50; // MediaWiki API's practical limit for anonymous requests
-      for (let i = 0; i < missing.length; i += CHUNK) {
-        const chunk = missing.slice(i, i + CHUNK);
-        try {
-          const batch = await fetchWikiThumbnailBatch(chunk);
-          Object.assign(PAL_IMAGES, batch);
-        } catch (err) {
-          // The request itself failed here (network error, CORS rejection,
-          // Fandom rate-limiting/downtime) - this is NOT the wiki telling us
-          // "this Pal has no thumbnail". Leave these names out of PAL_IMAGES
-          // entirely instead of caching them as null, so a one-time hiccup
-          // (e.g. the very first load from a fresh origin/localStorage)
-          // doesn't get baked in as "no image, forever" and retries on the
-          // next load instead.
-          console.warn('[PalPipeline] Wiki thumbnail batch failed, will retry next load:', err);
-        }
-      }
-      writeImageCache(PAL_IMAGES);
     }
 
     async function initializeApp(forceRefresh = false) {
@@ -628,9 +614,10 @@
         SPECIAL_COMBOS = buildSpecialCombos(breedingData, tribeToName);
 
         try {
-          await loadPalImages(PALDEX.map(p => p.name), forceRefresh);
+          await loadImageManifest();
         } catch (err) {
-          console.warn('[PalPipeline] Thumbnail loading failed entirely; continuing without images:', err);
+          console.warn('[PalPipeline] Image manifest loading failed entirely; continuing without images:', err);
+          PAL_IMAGES = {};
         }
 
         populateSelects();
@@ -946,6 +933,141 @@
     // ground-truth source checked) gives Carnibora, the higher of the two,
     // not Beakon. An earlier version of this tool guessed "lower Paldex
     // number wins" instead, which was wrong.
+    // Estimated passive-trait inheritance odds for a single cross.
+    //
+    // Pocketpair has never published an official formula for this - what
+    // follows is the community-reverse-engineered model (originally derived
+    // by Reddit user u/mgxts, and the same model the most actively
+    // maintained open-source breeding solver, PalCalc, builds on). Treat
+    // this as a reasonable estimate for COMPARING pipelines against each
+    // other, not as a guaranteed real-game percentage - the community's own
+    // tooling is explicit that this isn't independently verified against
+    // decompiled game code.
+    //
+    // The model:
+    //  1. Combine the "carrying" parent's total passive slots and the
+    //     other side's (a wild filler, or the other final-cross parent)
+    //     total passive slots into one pool.
+    //  2. The game rolls how many of the child's slots get filled FROM that
+    //     pool, weighted roughly 4:3:2:1 for filling 1/2/3/4 slots
+    //     (truncated + renormalized if the pool itself has fewer than 4).
+    //  3. Given that count, the specific slots that get filled are treated
+    //     as a uniform random draw (without replacement) from the pool -
+    //     this lets us compute the chance that every trait you actually
+    //     want ends up among them via the hypergeometric distribution.
+    //
+    // This deliberately ignores the game's separate "bonus random extra
+    // passive" mechanic, which can add junk on top but doesn't reduce the
+    // chance your wanted traits made it in - so leaving it out is a
+    // simplification, not an error in the direction that matters here.
+    const INHERIT_COUNT_WEIGHTS = [4, 3, 2, 1]; // relative weights for filling 1, 2, 3, 4 slots
+
+    // n-choose-r, used for the hypergeometric calculation below. Pool sizes
+    // here are always tiny (at most 8), so plain floating point is fine.
+    function nCr(n, r) {
+      if (r < 0 || r > n) return 0;
+      r = Math.min(r, n - r);
+      let result = 1;
+      for (let i = 0; i < r; i++) {
+        result = (result * (n - i)) / (i + 1);
+      }
+      return result;
+    }
+
+    // parentTotal/parentDesired describe the carrying side of the cross
+    // (the pal bringing the traits you want forward); wildTotal/wildDesired
+    // describe the other side (a filler, or the second final-cross parent).
+    // Returns a probability in [0, 1] that every desired trait from both
+    // sides ends up among the child's inherited slots.
+    function stepInheritanceProbability(parentTotal, parentDesired, wildTotal, wildDesired) {
+      const poolSize = parentTotal + wildTotal;
+      const desiredCount = parentDesired + wildDesired;
+      if (desiredCount === 0) return 1; // nothing required - vacuously guaranteed
+      if (poolSize === 0) return 0; // desired traits can't exist in an empty pool (shouldn't happen given desiredCount<=poolSize by construction)
+
+      const maxK = Math.min(4, poolSize);
+      const weights = INHERIT_COUNT_WEIGHTS.slice(0, maxK);
+      const weightSum = weights.reduce((a, b) => a + b, 0);
+
+      let probability = 0;
+      for (let k = 1; k <= maxK; k++) {
+        if (k < desiredCount) continue; // can't fit all desired traits in fewer slots than there are traits
+        const weight = weights[k - 1] / weightSum;
+        const pAllDesiredInK = nCr(poolSize - desiredCount, k - desiredCount) / nCr(poolSize, k);
+        probability += weight * pAllDesiredInK;
+      }
+      return probability;
+    }
+
+    function formatPct(p) {
+      return (p * 100).toFixed(1) + '%';
+    }
+
+    // Renders the compact "Parent traits: N of M desired / Wild traits: N of
+    // M desired" control row for one cross, plus its own live percent
+    // readout. `idPrefix` must be unique per step across the whole results
+    // view (see the pN-a/b/final scheme in calculateRoutes) since every
+    // control and readout is looked up by id.
+    function renderOddsWidget(idPrefix, onChangeAttr, defaults) {
+      const d = Object.assign({ parentTotal: 2, parentDesired: 2, wildTotal: 0, wildDesired: 0, parentLabel: 'Parent', wildLabel: 'Wild' }, defaults);
+      return `
+        <div class="odds-row">
+          <div class="odds-group">
+            ${d.parentLabel} traits:
+            <input type="number" class="odds-input" id="${idPrefix}-parentTotal" min="0" max="4" value="${d.parentTotal}" oninput="${onChangeAttr}">
+            of which desired:
+            <input type="number" class="odds-input" id="${idPrefix}-parentDesired" min="0" max="4" value="${d.parentDesired}" oninput="${onChangeAttr}">
+          </div>
+          <div class="odds-group">
+            ${d.wildLabel} traits:
+            <input type="number" class="odds-input" id="${idPrefix}-wildTotal" min="0" max="4" value="${d.wildTotal}" oninput="${onChangeAttr}">
+            of which desired:
+            <input type="number" class="odds-input" id="${idPrefix}-wildDesired" min="0" max="4" value="${d.wildDesired}" oninput="${onChangeAttr}">
+          </div>
+          <div>Step odds: <span class="odds-step-pct" id="${idPrefix}-pct">--</span></div>
+        </div>`;
+    }
+
+    // Reads and clamps one numeric input in place (so e.g. typing a
+    // "desired" count higher than the current "total" snaps back down),
+    // returning the clamped numeric value.
+    function clampOddsInput(id, min, max) {
+      const el = document.getElementById(id);
+      let v = parseInt(el.value, 10);
+      if (Number.isNaN(v)) v = min;
+      v = Math.max(min, Math.min(max, v));
+      el.value = v;
+      return v;
+    }
+
+    // Reads one step's four inputs, computes and displays its percent, and
+    // returns the raw probability for the caller to fold into the overall
+    // pipeline total.
+    function updateStepOdds(idPrefix) {
+      const parentTotal = clampOddsInput(`${idPrefix}-parentTotal`, 0, 4);
+      const parentDesired = clampOddsInput(`${idPrefix}-parentDesired`, 0, parentTotal);
+      const wildTotal = clampOddsInput(`${idPrefix}-wildTotal`, 0, 4);
+      const wildDesired = clampOddsInput(`${idPrefix}-wildDesired`, 0, wildTotal);
+      const p = stepInheritanceProbability(parentTotal, parentDesired, wildTotal, wildDesired);
+      const pctEl = document.getElementById(`${idPrefix}-pct`);
+      if (pctEl) pctEl.textContent = formatPct(p);
+      return p;
+    }
+
+    // Recomputes one pipeline card's overall odds (the product of every
+    // Line A step, every Line B step, and the final cross) and updates its
+    // headline readout. Called on load for each card (to show the default
+    // 2/2-vs-0/0 numbers immediately) and again on every odds-input change.
+    function recalcPipelineOdds(pipelineIdx, lineACount, lineBCount) {
+      let overall = 1;
+      for (let i = 0; i < lineACount; i++) overall *= updateStepOdds(`p${pipelineIdx}-a${i}`);
+      for (let i = 0; i < lineBCount; i++) overall *= updateStepOdds(`p${pipelineIdx}-b${i}`);
+      overall *= updateStepOdds(`p${pipelineIdx}-final`);
+      const el = document.getElementById(`p${pipelineIdx}-overall`);
+      if (el) el.textContent = formatPct(overall);
+      return overall;
+    }
+
     function getOffspring(pA, pB) {
       if (pA.name === pB.name) return pA;
 
@@ -1120,17 +1242,31 @@
 
         resultsDiv.innerHTML = `<h2 style="font-size:1rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-dim); margin-bottom:12px;">Found ${validPipelines.length} Available Multi-Step Pipelines</h2>`;
 
-        validPipelines.slice(0, 5).forEach((p) => {
+        validPipelines.slice(0, 5).forEach((p, idx) => {
           const card = document.createElement('div');
           card.className = 'card';
 
-          let lineAHTML = p.lineA_Steps.length === 0 
-            ? `<div class="step-text">Use ${renderPalLink(palA)} directly (0 steps)</div>`
-            : p.lineA_Steps.map(s => `<div class="step-text">${renderPalLink(s.parent)} × ${renderPalLink(s.filler, 'highlight')} (Clean) ➔ ${renderPalLink(s.result)}</div>`).join('');
+          const lineACount = p.lineA_Steps.length;
+          const lineBCount = p.lineB_Steps.length;
+          const onChange = `recalcPipelineOdds(${idx}, ${lineACount}, ${lineBCount})`;
 
-          let lineBHTML = p.lineB_Steps.length === 0 
+          let lineAHTML = lineACount === 0
+            ? `<div class="step-text">Use ${renderPalLink(palA)} directly (0 steps)</div>`
+            : p.lineA_Steps.map((s, i) => `
+                <div class="step-text">${renderPalLink(s.parent)} × ${renderPalLink(s.filler, 'highlight')} (Clean) ➔ ${renderPalLink(s.result)}</div>
+                ${renderOddsWidget(`p${idx}-a${i}`, onChange, { wildLabel: 'Wild' })}
+              `).join('');
+
+          let lineBHTML = lineBCount === 0
             ? `<div class="step-text">Use ${renderPalLink(palB)} directly (0 steps)</div>`
-            : p.lineB_Steps.map(s => `<div class="step-text">${renderPalLink(s.parent)} × ${renderPalLink(s.filler, 'highlight')} (Clean) ➔ ${renderPalLink(s.result)}</div>`).join('');
+            : p.lineB_Steps.map((s, i) => `
+                <div class="step-text">${renderPalLink(s.parent)} × ${renderPalLink(s.filler, 'highlight')} (Clean) ➔ ${renderPalLink(s.result)}</div>
+                ${renderOddsWidget(`p${idx}-b${i}`, onChange, { wildLabel: 'Wild' })}
+              `).join('');
+
+          const finalOddsHTML = renderOddsWidget(`p${idx}-final`, onChange, {
+            parentLabel: 'Parent A', wildLabel: 'Parent B', wildTotal: 2, wildDesired: 2
+          });
 
           const matchBadge = p.matchedIncludes.length > 0
             ? `<div class="match-badge">✓ Uses ${p.matchedIncludes.length} included Pal${p.matchedIncludes.length > 1 ? 's' : ''}: ${p.matchedIncludes.join(', ')}</div>`
@@ -1138,6 +1274,10 @@
 
           card.innerHTML = `
             ${matchBadge}
+            <div class="overall-odds">
+              <div class="value" id="p${idx}-overall">--</div>
+              <div class="label">Estimated chance the final egg has all 4 target traits</div>
+            </div>
             <div class="route-card">
               <div class="line-title">Line A Steps (Isolate Traits 1 & 2)</div>
               ${lineAHTML}
@@ -1149,9 +1289,17 @@
             <div class="route-card" style="border-left-color: var(--accent-green);">
               <div class="line-title" style="color: var(--accent-green);">Final Cross (Combine All 4 Traits)</div>
               <div class="step-text">${renderPalLink(p.finalA)} × ${renderPalLink(p.finalB)} ➔ ${renderPalLink(target, 'target-highlight')}</div>
+              ${finalOddsHTML}
+            </div>
+            <div class="odds-disclaimer">
+              Trait odds are an estimate based on community-reverse-engineered inheritance mechanics
+              (Pocketpair has not published an official formula) - useful for comparing pipelines,
+              not a guaranteed real-game percentage. Adjust the counts above to see how "dirty"
+              (non-target) traits on a parent or filler affect the odds.
             </div>
           `;
           resultsDiv.appendChild(card);
+          recalcPipelineOdds(idx, lineACount, lineBCount);
         });
       }, 50);
     }
