@@ -26,10 +26,10 @@ test('trait inheritance probability model', async (t) => {
     assert.ok(Math.abs(p - (3 / 7) * 0.4) < 1e-9);
   });
 
-  await t.test('zero desired traits is vacuously guaranteed (100%), with or without junk present', async () => {
+  await t.test('zero desired traits is only vacuously guaranteed (100%) if the pool is ALSO empty - a nonempty pool always inherits 1+ traits, so a literal 0-trait result is impossible (0%), not just unlikely', async () => {
     const app = loadApp();
     assert.equal(app.stepInheritanceProbability(0, 0, 0, 0), 1);
-    assert.equal(app.stepInheritanceProbability(2, 0, 3, 0), 1);
+    assert.equal(app.stepInheritanceProbability(2, 0, 3, 0), 0);
   });
 
   await t.test('adding junk traits strictly decreases the odds', async () => {

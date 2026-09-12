@@ -1016,7 +1016,18 @@
     function stepInheritanceProbability(parentTotal, parentDesired, wildTotal, wildDesired) {
       const poolSize = parentTotal + wildTotal;
       const desiredCount = parentDesired + wildDesired;
-      if (desiredCount === 0) return 1; // nothing required - vacuously guaranteed
+      if (desiredCount === 0) {
+        // Wanting zero traits means a clean result requires the child to
+        // come out completely empty. With an empty pool there's nothing to
+        // inherit, so that's vacuously guaranteed. But INHERIT_COUNT_WEIGHTS
+        // only has buckets for inheriting 1-4 slots - the pool roll can
+        // never land on 0 - so once the pool has ANY trait in it, at least
+        // one is always going to end up on the child. A literal 0-trait
+        // result from a nonempty pool isn't just unlikely, it's impossible
+        // under this model (matching PalCalc and the wider community
+        // consensus: nobody's documented a path to it).
+        return poolSize === 0 ? 1 : 0;
+      }
       if (poolSize === 0) return 0; // desired traits can't exist in an empty pool (shouldn't happen given desiredCount<=poolSize by construction)
 
       const maxK = Math.min(4, poolSize);
@@ -1338,14 +1349,14 @@
           let lineAHTML = lineACount === 0
             ? `<div class="step-text">Use ${renderPalLink(palA)} directly (0 steps)</div>`
             : p.lineA_Steps.map((s, i) => `
-                <div class="step-text">${renderPalLink(s.parent)} × ${renderPalLink(s.filler, 'highlight')} (Clean) ➔ ${renderPalLink(s.result)}</div>
+                <div class="step-text">${renderPalLink(s.parent)} × ${renderPalLink(s.filler, 'highlight')} ➔ ${renderPalLink(s.result)}</div>
                 ${renderOddsWidget(`p${idx}-a${i}`, onChange, { wildLabel: 'Wild' })}
               `).join('');
 
           let lineBHTML = lineBCount === 0
             ? `<div class="step-text">Use ${renderPalLink(palB)} directly (0 steps)</div>`
             : p.lineB_Steps.map((s, i) => `
-                <div class="step-text">${renderPalLink(s.parent)} × ${renderPalLink(s.filler, 'highlight')} (Clean) ➔ ${renderPalLink(s.result)}</div>
+                <div class="step-text">${renderPalLink(s.parent)} × ${renderPalLink(s.filler, 'highlight')} ➔ ${renderPalLink(s.result)}</div>
                 ${renderOddsWidget(`p${idx}-b${i}`, onChange, { wildLabel: 'Wild' })}
               `).join('');
 
