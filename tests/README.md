@@ -62,6 +62,38 @@ hand-rolled imitation of that mapping logic.
   (which replaced fetching thumbnails from a live wiki API at runtime),
   including that a missing manifest degrades gracefully instead of breaking
   anything.
+- **`trait-odds.test.js`** - the passive-trait inheritance probability model
+  (validated against a documented reference point: 4 clean desired traits
+  split any way between two parents gives exactly 10%), the "expected eggs
+  needed" / "first-try chance" stats derived from it, and their DOM wiring.
+
+## A note on `innerHTML` and live inputs
+
+The harness's fake DOM does not parse HTML strings - setting
+`element.innerHTML = "...<input value='2'>..."` just stores that text on
+the `.innerHTML` property, it does not create a real child `<input>` whose
+`.value` is `"2"`. `document.getElementById()` only "sees" elements that
+were actually created through it or `createElement()`.
+
+This matters for anything that renders a template string containing inputs
+and then reads them back by id (like the trait-odds widgets): a quick ad
+hoc script that calls e.g. `recalcPipelineOdds()` right after rendering,
+without first manually setting each input's `.value` to match what the
+template says, will read back empty strings - `parseInt('', 10)` is `NaN`,
+which the clamping falls back to `0`, silently producing nonsense results
+(a step that should read 2/2 will compute as the vacuous 0/0 "nothing
+required" case instead). This isn't a bug in the app - a real browser
+parses `value="2"` into a live input just fine - it's purely an artifact of
+this harness's no-parsing shortcut.
+
+The permanent tests avoid this by explicitly seeding every input's
+`.value` before calling anything that reads it (see the `seed()` helpers in
+`trait-odds.test.js`). When writing a new test - or a quick manual check -
+that touches rendered form inputs, do the same: either seed the values by
+hand, or restrict the check to the HTML *string* itself (regex/substring
+matching on `card.innerHTML`, as the "renders odds widgets with correct
+ids and defaults" test does) rather than reading values back through
+`getElementById()`.
 
 ## A note on cross-realm objects
 
