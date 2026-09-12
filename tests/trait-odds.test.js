@@ -17,11 +17,13 @@ test('trait inheritance probability model', async (t) => {
     }
   );
 
-  await t.test('default case (2/2 parent, 0/0 wild) matches the hand-derived hypergeometric value', async () => {
+  await t.test('default case (2/2 parent, 0/0 wild) matches the hand-derived value', async () => {
     const app = loadApp();
     const p = app.stepInheritanceProbability(2, 2, 0, 0);
-    // pool=2, desired=2: only k=2 can satisfy it, weight 3/7, hypergeometric term = 1
-    assert.ok(Math.abs(p - 3 / 7) < 1e-9);
+    // pool=2, desired=2: only k=2 can satisfy it (weight 3/7), hypergeometric
+    // term = 1, but 2 of the child's 4 slots are left empty by that roll -
+    // a clean result also needs the mutation check to skip them (40%).
+    assert.ok(Math.abs(p - (3 / 7) * 0.4) < 1e-9);
   });
 
   await t.test('zero desired traits is vacuously guaranteed (100%), with or without junk present', async () => {
@@ -133,15 +135,18 @@ test('trait odds UI generation and recalculation', async (t) => {
 
     const { totalEggs, firstTryChance } = app.recalcPipelineOdds(0, 1, 2); // 1 Line A step, 2 Line B steps
 
-    // Each 2/2-vs-0/0 step has p=3/7 (expected attempts 7/3); the final
-    // cross's 2/2-vs-2/2 has p=0.10 (expected attempts 10). Eggs should ADD.
-    const expectedEggs = 3 * (7 / 3) + 10;
+    // Each 2/2-vs-0/0 step has p=(3/7)*0.4=6/35 (expected attempts 35/6);
+    // the final cross's 2/2-vs-2/2 has p=0.10 (expected attempts 10, no
+    // mutation factor since all 4 slots are filled by the pool roll
+    // there). Eggs should ADD.
+    const stepP = (3 / 7) * 0.4;
+    const expectedEggs = 3 * (1 / stepP) + 10;
     assert.ok(Math.abs(totalEggs - expectedEggs) < 1e-9, `expected ${expectedEggs}, got ${totalEggs}`);
 
     // The old multiplicative "first-try" figure should still be available,
     // just as the secondary stat, and should equal the product of the same
     // per-step probabilities.
-    const expectedFirstTry = Math.pow(3 / 7, 3) * 0.10;
+    const expectedFirstTry = Math.pow(stepP, 3) * 0.10;
     assert.ok(Math.abs(firstTryChance - expectedFirstTry) < 1e-9);
 
     assert.equal(app.document.getElementById('p0-overall-eggs').textContent, app.formatEggs(totalEggs));
@@ -197,7 +202,7 @@ test('trait odds UI generation and recalculation', async (t) => {
     seed('p0-final', 2, 2, 2, 2);
     const { totalEggs } = app.recalcPipelineOdds(0, 0, 1); // lineACount = 0
 
-    const expected = 7 / 3 + 10;
+    const expected = 1 / ((3 / 7) * 0.4) + 10;
     assert.ok(Math.abs(totalEggs - expected) < 1e-9, `expected ${expected}, got ${totalEggs}`);
   });
 

@@ -955,23 +955,44 @@
     // tooling is explicit that this isn't independently verified against
     // decompiled game code.
     //
-    // The model:
+    // A "success" here means a CLEAN result: the child ends up with exactly
+    // the desired traits and nothing else. That's the bar a multi-step
+    // pipeline actually needs, since any extra junk riding along on an
+    // intermediate result complicates every step downstream of it. The
+    // model has three independent rolls, all multiplied together:
     //  1. Combine the "carrying" parent's total passive slots and the
     //     other side's (a wild filler, or the other final-cross parent)
-    //     total passive slots into one pool.
-    //  2. The game rolls how many of the child's slots get filled FROM that
-    //     pool, weighted roughly 4:3:2:1 for filling 1/2/3/4 slots
-    //     (truncated + renormalized if the pool itself has fewer than 4).
-    //  3. Given that count, the specific slots that get filled are treated
-    //     as a uniform random draw (without replacement) from the pool -
-    //     this lets us compute the chance that every trait you actually
-    //     want ends up among them via the hypergeometric distribution.
+    //     total passive slots into one pool. The game rolls how many of
+    //     the child's slots get filled FROM that pool, weighted roughly
+    //     4:3:2:1 for filling 1/2/3/4 slots (truncated + renormalized if
+    //     the pool itself has fewer than 4). For a clean result this MUST
+    //     land exactly on the number of desired traits - filling more
+    //     than that necessarily pulls in undesired traits from the same
+    //     pool, and filling fewer can't fit every desired trait at all.
+    //  2. Given that the roll landed on exactly the desired count, the
+    //     specific slots that get filled are a uniform random draw
+    //     (without replacement) from the pool - use the hypergeometric
+    //     distribution for the chance that draw is precisely the desired
+    //     traits and none of the pool's other ones.
+    //  3. Any of the child's 4 slots not filled by that draw are still
+    //     open to the game's separate "bonus random extra passive"
+    //     mutation check, which can inject an unrelated trait into them.
+    //     MUTATION_SKIP_CHANCE is the odds that check simply doesn't fire,
+    //     leaving those slots empty/clean.
     //
-    // This deliberately ignores the game's separate "bonus random extra
-    // passive" mechanic, which can add junk on top but doesn't reduce the
-    // chance your wanted traits made it in - so leaving it out is a
-    // simplification, not an error in the direction that matters here.
+    // Known omission: there's also a small extra path to a clean result
+    // where the pool roll comes up short of the desired count, but the
+    // mutation check then happens to roll the exact missing trait(s)
+    // instead of a random one - a source citing this puts it around an
+    // additional ~1.33 percentage points on top of the ~2% this model
+    // gives for a typical 2-desired-out-of-4-pool cross. Modeling it
+    // properly needs the size of the game's whole passive-trait pool
+    // (to know the odds a "random" mutation lands on one specific trait),
+    // which isn't tracked anywhere in this tool - so it's left out, making
+    // this model's numbers a slight underestimate of the true clean-result
+    // chance rather than an overestimate.
     const INHERIT_COUNT_WEIGHTS = [4, 3, 2, 1]; // relative weights for filling 1, 2, 3, 4 slots
+    const MUTATION_SKIP_CHANCE = 0.4; // odds the "bonus random extra passive" check doesn't fire at all
 
     // n-choose-r, used for the hypergeometric calculation below. Pool sizes
     // here are always tiny (at most 8), so plain floating point is fine.
@@ -988,8 +1009,10 @@
     // parentTotal/parentDesired describe the carrying side of the cross
     // (the pal bringing the traits you want forward); wildTotal/wildDesired
     // describe the other side (a filler, or the second final-cross parent).
-    // Returns a probability in [0, 1] that every desired trait from both
-    // sides ends up among the child's inherited slots.
+    // Returns a probability in [0, 1] that the child comes out CLEAN: it
+    // has exactly the desired traits from both sides, and nothing else -
+    // no other pool trait tagged along, and no random mutation added junk
+    // to whatever slots were left empty.
     function stepInheritanceProbability(parentTotal, parentDesired, wildTotal, wildDesired) {
       const poolSize = parentTotal + wildTotal;
       const desiredCount = parentDesired + wildDesired;
@@ -997,17 +1020,25 @@
       if (poolSize === 0) return 0; // desired traits can't exist in an empty pool (shouldn't happen given desiredCount<=poolSize by construction)
 
       const maxK = Math.min(4, poolSize);
+      if (desiredCount > maxK) return 0; // can't fit every desired trait even filling every available slot
+
       const weights = INHERIT_COUNT_WEIGHTS.slice(0, maxK);
       const weightSum = weights.reduce((a, b) => a + b, 0);
 
-      let probability = 0;
-      for (let k = 1; k <= maxK; k++) {
-        if (k < desiredCount) continue; // can't fit all desired traits in fewer slots than there are traits
-        const weight = weights[k - 1] / weightSum;
-        const pAllDesiredInK = nCr(poolSize - desiredCount, k - desiredCount) / nCr(poolSize, k);
-        probability += weight * pAllDesiredInK;
-      }
-      return probability;
+      // A clean result requires the pool roll to land EXACTLY on
+      // desiredCount slots - fewer can't fit every desired trait, more
+      // necessarily pulls in an undesired one from the same pool.
+      const k = desiredCount;
+      const pExactlyK = weights[k - 1] / weightSum;
+      const pDesiredComboGivenK = nCr(poolSize - desiredCount, k - desiredCount) / nCr(poolSize, k); // = 1 / nCr(poolSize, k) since k === desiredCount
+
+      // Any of the child's 4 slots the pool roll didn't fill are still
+      // open to the separate mutation check; a clean result needs it to
+      // skip entirely rather than inject junk into them.
+      const emptySlots = 4 - k;
+      const pNoMutationJunk = emptySlots > 0 ? MUTATION_SKIP_CHANCE : 1;
+
+      return pExactlyK * pDesiredComboGivenK * pNoMutationJunk;
     }
 
     function formatPct(p) {
@@ -1349,7 +1380,9 @@
             <div class="odds-disclaimer">
               Trait odds are an estimate based on community-reverse-engineered inheritance mechanics
               (Pocketpair has not published an official formula) - useful for comparing pipelines,
-              not a guaranteed real-game percentage. Adjust the counts above to see how "dirty"
+              not a guaranteed real-game percentage. Each step's odds are the chance of a CLEAN result -
+              exactly the desired traits and nothing else, including the game's random mutation check
+              not adding junk to any leftover slot. Adjust the counts above to see how "dirty"
               (non-target) traits on a parent or filler affect the odds.
             </div>
           `;
