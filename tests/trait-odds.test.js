@@ -58,7 +58,41 @@ test('trait inheritance probability model', async (t) => {
       }
     }
   });
+
+  await t.test('more than 4 total desired traits is genuinely impossible (child has only 4 slots) -> probability 0', async () => {
+    const app = loadApp();
+    // 4 desired on each side = 8 total desired, but only 4 slots exist on the child
+    const p = app.stepInheritanceProbability(4, 4, 4, 4);
+    assert.equal(p, 0);
+  });
 });
+
+test('expected-eggs (primary stat) and formatting', async (t) => {
+  await t.test('expectedAttempts is the reciprocal of the probability', async () => {
+    const app = loadApp();
+    assert.ok(Math.abs(app.expectedAttempts(0.1) - 10) < 1e-9);
+    assert.ok(Math.abs(app.expectedAttempts(0.5) - 2) < 1e-9);
+    assert.equal(app.expectedAttempts(1), 1);
+  });
+
+  await t.test('expectedAttempts of an impossible step (p=0) is Infinity, not a crash or NaN', async () => {
+    const app = loadApp();
+    assert.equal(app.expectedAttempts(0), Infinity);
+  });
+
+  await t.test('formatEggs renders Infinity as an explicit "impossible" message, not "Infinity"', async () => {
+    const app = loadApp();
+    assert.match(app.formatEggs(Infinity), /never|impossible/i);
+    assert.doesNotMatch(app.formatEggs(Infinity), /Infinity/);
+  });
+
+  await t.test('formatEggs uses singular "egg" only for a value that rounds to 1', async () => {
+    const app = loadApp();
+    assert.match(app.formatEggs(1), /\begg\b(?!s)/);
+    assert.match(app.formatEggs(2.3), /eggs/);
+  });
+});
+
 
 test('trait odds UI generation and recalculation', async (t) => {
   await t.test('calculateRoutes() renders odds widgets with correct ids and defaults in the card HTML', async () => {
@@ -76,13 +110,14 @@ test('trait odds UI generation and recalculation', async (t) => {
     assert.ok(firstCard, 'expected at least one rendered pipeline card');
 
     const html = firstCard.innerHTML;
-    assert.match(html, /id="p0-overall"/);
+    assert.match(html, /id="p0-overall-eggs"/);
+    assert.match(html, /id="p0-overall-firsttry"/);
     assert.match(html, /id="p0-final-parentTotal"[^>]*value="2"/, 'final cross Parent A should default to 2 total');
     assert.match(html, /id="p0-final-wildTotal"[^>]*value="2"/, 'final cross Parent B should default to 2 total (not the usual wild default of 0)');
     assert.match(html, /recalcPipelineOdds\(0,/, 'inputs should wire up to recalcPipelineOdds for this card index');
   });
 
-  await t.test('recalcPipelineOdds correctly multiplies every step (Line A x Line B x final)', () => {
+  await t.test('recalcPipelineOdds sums expected eggs ADDITIVELY across steps (not multiplicatively)', () => {
     const app = loadApp();
     const seed = (prefix, parentTotal, parentDesired, wildTotal, wildDesired) => {
       app.document.getElementById(`${prefix}-parentTotal`).value = parentTotal;
@@ -96,13 +131,24 @@ test('trait odds UI generation and recalculation', async (t) => {
     seed('p0-b1', 2, 2, 0, 0);
     seed('p0-final', 2, 2, 2, 2);
 
-    const overall = app.recalcPipelineOdds(0, 1, 2); // 1 Line A step, 2 Line B steps
-    const expected = Math.pow(3 / 7, 3) * 0.10; // 3 clean steps at 3/7 each, final at 10%
-    assert.ok(Math.abs(overall - expected) < 1e-9, `expected ${expected}, got ${overall}`);
-    assert.equal(app.document.getElementById('p0-overall').textContent, app.formatPct(overall));
+    const { totalEggs, firstTryChance } = app.recalcPipelineOdds(0, 1, 2); // 1 Line A step, 2 Line B steps
+
+    // Each 2/2-vs-0/0 step has p=3/7 (expected attempts 7/3); the final
+    // cross's 2/2-vs-2/2 has p=0.10 (expected attempts 10). Eggs should ADD.
+    const expectedEggs = 3 * (7 / 3) + 10;
+    assert.ok(Math.abs(totalEggs - expectedEggs) < 1e-9, `expected ${expectedEggs}, got ${totalEggs}`);
+
+    // The old multiplicative "first-try" figure should still be available,
+    // just as the secondary stat, and should equal the product of the same
+    // per-step probabilities.
+    const expectedFirstTry = Math.pow(3 / 7, 3) * 0.10;
+    assert.ok(Math.abs(firstTryChance - expectedFirstTry) < 1e-9);
+
+    assert.equal(app.document.getElementById('p0-overall-eggs').textContent, app.formatEggs(totalEggs));
+    assert.equal(app.document.getElementById('p0-overall-firsttry').textContent, app.formatPct(firstTryChance));
   });
 
-  await t.test('dirtying one step reduces the overall odds without needing to touch the others', () => {
+  await t.test('dirtying one step increases total expected eggs without needing to touch the others', () => {
     const app = loadApp();
     const seed = (prefix, parentTotal, parentDesired, wildTotal, wildDesired) => {
       app.document.getElementById(`${prefix}-parentTotal`).value = parentTotal;
@@ -118,10 +164,27 @@ test('trait odds UI generation and recalculation', async (t) => {
     seed('p0-a0', 2, 2, 1, 0); // introduce 1 junk trait on the wild side of this step
     const dirty = app.recalcPipelineOdds(0, 1, 0);
 
-    assert.ok(dirty < clean, `expected dirtying a step to lower the overall odds: ${dirty} vs ${clean}`);
+    assert.ok(dirty.totalEggs > clean.totalEggs, `expected dirtying a step to raise expected eggs: ${dirty.totalEggs} vs ${clean.totalEggs}`);
+    assert.ok(dirty.firstTryChance < clean.firstTryChance, `expected dirtying a step to lower first-try chance: ${dirty.firstTryChance} vs ${clean.firstTryChance}`);
   });
 
-  await t.test('a 0-step line contributes nothing to the product (only the other line + final matter)', () => {
+  await t.test('a genuinely impossible step (>4 total desired) surfaces as "impossible", not a broken number', () => {
+    const app = loadApp();
+    const seed = (prefix, parentTotal, parentDesired, wildTotal, wildDesired) => {
+      app.document.getElementById(`${prefix}-parentTotal`).value = parentTotal;
+      app.document.getElementById(`${prefix}-parentDesired`).value = parentDesired;
+      app.document.getElementById(`${prefix}-wildTotal`).value = wildTotal;
+      app.document.getElementById(`${prefix}-wildDesired`).value = wildDesired;
+    };
+
+    seed('p0-final', 4, 4, 4, 4); // 8 desired traits, only 4 child slots exist
+    const { totalEggs } = app.recalcPipelineOdds(0, 0, 0);
+
+    assert.equal(totalEggs, Infinity);
+    assert.match(app.document.getElementById('p0-overall-eggs').textContent, /impossible|never/i);
+  });
+
+  await t.test('a 0-step line contributes nothing to the total (only the other line + final matter)', () => {
     const app = loadApp();
     const seed = (prefix, parentTotal, parentDesired, wildTotal, wildDesired) => {
       app.document.getElementById(`${prefix}-parentTotal`).value = parentTotal;
@@ -132,10 +195,10 @@ test('trait odds UI generation and recalculation', async (t) => {
 
     seed('p0-b0', 2, 2, 0, 0);
     seed('p0-final', 2, 2, 2, 2);
-    const overall = app.recalcPipelineOdds(0, 0, 1); // lineACount = 0
+    const { totalEggs } = app.recalcPipelineOdds(0, 0, 1); // lineACount = 0
 
-    const expected = (3 / 7) * 0.10;
-    assert.ok(Math.abs(overall - expected) < 1e-9, `expected ${expected}, got ${overall}`);
+    const expected = 7 / 3 + 10;
+    assert.ok(Math.abs(totalEggs - expected) < 1e-9, `expected ${expected}, got ${totalEggs}`);
   });
 
   await t.test('clampOddsInput snaps a desired count down if it exceeds the current total', () => {

@@ -157,6 +157,17 @@
       text-transform: uppercase;
       letter-spacing: 0.04em;
     }
+    .overall-odds .secondary-stat {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px solid var(--border);
+    }
+    .overall-odds .secondary-stat span {
+      font-weight: 700;
+      color: var(--text);
+    }
     .odds-row {
       display: flex;
       flex-wrap: wrap;
@@ -1003,6 +1014,22 @@
       return (p * 100).toFixed(1) + '%';
     }
 
+    // Expected number of eggs you'll need to hatch AT THIS STEP before one
+    // comes out with the desired traits, if you keep retrying until it
+    // does (a geometric distribution: expected attempts = 1/p). This is
+    // the number that actually maps to real cost (cakes, incubator time) -
+    // unlike the probability itself, expected-attempts values ADD UP
+    // across a pipeline's steps rather than multiply, since each step is
+    // its own independent "retry until it works" process.
+    function expectedAttempts(p) {
+      return p > 0 ? 1 / p : Infinity;
+    }
+
+    function formatEggs(n) {
+      if (!Number.isFinite(n)) return 'never (impossible with these counts)';
+      return (n < 10 ? n.toFixed(1) : Math.round(n).toString()) + (n <= 1.05 ? ' egg' : ' eggs');
+    }
+
     // Renders the compact "Parent traits: N of M desired / Wild traits: N of
     // M desired" control row for one cross, plus its own live percent
     // readout. `idPrefix` must be unique per step across the whole results
@@ -1040,9 +1067,9 @@
       return v;
     }
 
-    // Reads one step's four inputs, computes and displays its percent, and
-    // returns the raw probability for the caller to fold into the overall
-    // pipeline total.
+    // Reads one step's four inputs, computes and displays its percent AND
+    // its expected-eggs-until-success, and returns the raw probability for
+    // the caller to fold into the pipeline-wide totals.
     function updateStepOdds(idPrefix) {
       const parentTotal = clampOddsInput(`${idPrefix}-parentTotal`, 0, 4);
       const parentDesired = clampOddsInput(`${idPrefix}-parentDesired`, 0, parentTotal);
@@ -1050,22 +1077,50 @@
       const wildDesired = clampOddsInput(`${idPrefix}-wildDesired`, 0, wildTotal);
       const p = stepInheritanceProbability(parentTotal, parentDesired, wildTotal, wildDesired);
       const pctEl = document.getElementById(`${idPrefix}-pct`);
-      if (pctEl) pctEl.textContent = formatPct(p);
+      if (pctEl) pctEl.textContent = `${formatPct(p)} (~${formatEggs(expectedAttempts(p))} at this step)`;
       return p;
     }
 
-    // Recomputes one pipeline card's overall odds (the product of every
-    // Line A step, every Line B step, and the final cross) and updates its
-    // headline readout. Called on load for each card (to show the default
-    // 2/2-vs-0/0 numbers immediately) and again on every odds-input change.
+    // Recomputes one pipeline card's totals and updates both readouts:
+    //  - Expected eggs needed (PRIMARY): the sum of each step's expected
+    //    attempts. This is the number that maps to actual cost, since you
+    //    hatch and retry each step independently until it works - costs
+    //    add up across steps, they don't compound into a single "success
+    //    chance."
+    //  - Chance every step succeeds on the first try, zero retries
+    //    anywhere (SECONDARY): the product of every step's probability.
+    //    This used to be shown as the headline "chance of success," which
+    //    was misleading - with normal retry behavior you will eventually
+    //    succeed at every step given a nonzero chance, so that reading
+    //    doesn't reflect how breeding actually plays out. Kept as a
+    //    smaller secondary stat since it's still a reasonable relative
+    //    signal for comparing pipelines (higher generally means cheaper),
+    //    just not "your odds."
+    // Called on load for each card (to show the default 2/2-vs-0/0 numbers
+    // immediately) and again on every odds-input change.
     function recalcPipelineOdds(pipelineIdx, lineACount, lineBCount) {
-      let overall = 1;
-      for (let i = 0; i < lineACount; i++) overall *= updateStepOdds(`p${pipelineIdx}-a${i}`);
-      for (let i = 0; i < lineBCount; i++) overall *= updateStepOdds(`p${pipelineIdx}-b${i}`);
-      overall *= updateStepOdds(`p${pipelineIdx}-final`);
-      const el = document.getElementById(`p${pipelineIdx}-overall`);
-      if (el) el.textContent = formatPct(overall);
-      return overall;
+      let firstTryChance = 1;
+      let totalEggs = 0;
+      for (let i = 0; i < lineACount; i++) {
+        const p = updateStepOdds(`p${pipelineIdx}-a${i}`);
+        firstTryChance *= p;
+        totalEggs += expectedAttempts(p);
+      }
+      for (let i = 0; i < lineBCount; i++) {
+        const p = updateStepOdds(`p${pipelineIdx}-b${i}`);
+        firstTryChance *= p;
+        totalEggs += expectedAttempts(p);
+      }
+      const pFinal = updateStepOdds(`p${pipelineIdx}-final`);
+      firstTryChance *= pFinal;
+      totalEggs += expectedAttempts(pFinal);
+
+      const eggsEl = document.getElementById(`p${pipelineIdx}-overall-eggs`);
+      if (eggsEl) eggsEl.textContent = formatEggs(totalEggs);
+      const firstTryEl = document.getElementById(`p${pipelineIdx}-overall-firsttry`);
+      if (firstTryEl) firstTryEl.textContent = formatPct(firstTryChance);
+
+      return { totalEggs, firstTryChance };
     }
 
     function getOffspring(pA, pB) {
@@ -1131,7 +1186,7 @@
       const pal = typeof palObj === "string" ? PALDEX.find(p => p.name === palObj) : palObj;
       if (!pal) return palObj;
       const src = PAL_IMAGES[pal.name];
-      const thumb = src ? `<img class="pal-thumb" src="${src}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : '';
+      const thumb = src ? `<img class="pal-thumb" src="${src}" alt="" onerror="this.remove()">` : '';
       return `<button class="pal-link ${extraClass}" onclick="openPalModal('${pal.name}')">${thumb}${pal.name} (${pal.power})</button>`;
     }
 
@@ -1149,7 +1204,6 @@
       const src = PAL_IMAGES[pal.name];
       if (src) {
         const img = document.createElement('img');
-        img.referrerPolicy = 'no-referrer';
         img.src = src;
         img.alt = pal.name;
         img.onerror = () => { avatar.innerHTML = ''; avatar.textContent = pal.name.charAt(0); };
@@ -1275,8 +1329,9 @@
           card.innerHTML = `
             ${matchBadge}
             <div class="overall-odds">
-              <div class="value" id="p${idx}-overall">--</div>
-              <div class="label">Estimated chance the final egg has all 4 target traits</div>
+              <div class="value" id="p${idx}-overall-eggs">--</div>
+              <div class="label">Expected eggs needed to complete this whole pipeline</div>
+              <div class="secondary-stat">Chance every step succeeds on the first try, no retries: <span id="p${idx}-overall-firsttry">--</span></div>
             </div>
             <div class="route-card">
               <div class="line-title">Line A Steps (Isolate Traits 1 & 2)</div>
