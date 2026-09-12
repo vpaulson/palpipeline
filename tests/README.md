@@ -58,6 +58,23 @@ hand-rolled imitation of that mapping logic.
   test for the load-order bug where `setupPowerRangeSlider()` used to
   overwrite an incoming shared link's params with defaults before they were
   ever read.
+- **`image-manifest.test.js`** - the local `images-manifest.json` loader
+  (which replaced fetching thumbnails from a live wiki API at runtime),
+  including that a missing manifest degrades gracefully instead of breaking
+  anything.
+
+## A note on cross-realm objects
+
+`vm.createContext()` gives each loaded app its own realm, with its own
+`Object`, `Array`, etc. An empty object literal created inside that sandbox
+(`{}`) is not `assert.deepEqual`-identical to one created in the outer test
+file, even though both are empty - `deepEqual` (which is strict under
+`node:assert/strict`) compares prototypes, and the two `{}`s have different
+`Object.prototype` references from different realms. When asserting on
+plain objects/arrays that came out of `loadApp()`/`loadInitializedApp()`,
+prefer checking shape (`Object.keys(x).length`, `Array.isArray(x)`,
+individual property values) over `assert.deepEqual(x, {})` or similar
+literal comparisons.
 
 ## A note on synthetic vs. real test data
 

@@ -142,8 +142,11 @@ function fixtureFetch(pals, breeding, { steamBuildId = 'TEST-BUILD' } = {}) {
     if (url.includes('breeding.json')) {
       return { ok: true, json: async () => breeding };
     }
-    if (url.includes('fandom.com')) {
-      return { ok: true, json: async () => ({ query: { pages: {} } }) };
+    if (url.includes('images-manifest.json')) {
+      // Simulates the realistic case where download-images.js hasn't been
+      // run yet in this environment - loadImageManifest() should handle
+      // this gracefully (empty PAL_IMAGES, no thrown error).
+      return { ok: false, status: 404 };
     }
     throw new Error(`Unexpected fetch URL in test: ${url}`);
   };
